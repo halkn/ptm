@@ -30,7 +30,7 @@ def get_installed_version(spec: ToolSpec) -> str | None:
 def version_status(installed: str | None, latest: str) -> str:
     if installed is None:
         return "[red]not installed[/red]"
-    if installed == latest or installed.lstrip("v") == latest:
+    if installed == latest or installed.removeprefix("v") == latest:
         return "[green]up-to-date[/green]"
     return "[yellow]outdated[/yellow]"
 
@@ -74,12 +74,12 @@ def _get_platform_template(spec: ToolSpec) -> str:
 
 def resolve_asset_url(spec: ToolSpec, tag: str) -> str:
     template = _get_platform_template(spec)
-    version = tag.lstrip("v")
+    version = tag.removeprefix("v")
     asset = template.replace("{tag}", tag).replace("{version}", version)
     return f"https://github.com/{spec.repo}/releases/download/{tag}/{asset}"
 
 
 def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
     template = _get_platform_template(spec)
-    v = version.lstrip("v")
+    v = version.removeprefix("v")
     return template.replace("{version}", v).replace("{tag}", version)

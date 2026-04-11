@@ -3,7 +3,7 @@ import sys
 import httpx
 from rich.table import Table
 
-from ptm.config import console
+from ptm.console import console
 from ptm.installer import do_install
 from ptm.models import ToolSpec
 from ptm.resolver import (
@@ -14,30 +14,38 @@ from ptm.resolver import (
 )
 
 
-def cmd_install(
-    tools: list[ToolSpec], target: str | None, client: httpx.Client
-) -> None:
+def _filter_tools(tools: list[ToolSpec], target: str | None) -> list[ToolSpec]:
     targets = [t for t in tools if target is None or t.bin == target]
     if not targets:
         console.print(f"[red]Tool not found: {target}[/red]")
         sys.exit(1)
-    for spec in targets:
+    return targets
+
+
+def cmd_install(
+    tools: list[ToolSpec], target: str | None, client: httpx.Client
+) -> None:
+    failed = False
+    for spec in _filter_tools(tools, target):
         installed = get_installed_version(spec)
         if installed is not None and target is None:
             console.print(
                 f"[dim]  {spec.bin}: already installed ({installed}), skipping[/dim]"
             )
             continue
-        do_install(spec, client)
+        if not do_install(spec, client):
+            failed = True
+    if failed:
+        sys.exit(1)
 
 
 def cmd_update(tools: list[ToolSpec], target: str | None, client: httpx.Client) -> None:
-    targets = [t for t in tools if target is None or t.bin == target]
-    if not targets:
-        console.print(f"[red]Tool not found: {target}[/red]")
+    failed = False
+    for spec in _filter_tools(tools, target):
+        if not do_install(spec, client, update=True):
+            failed = True
+    if failed:
         sys.exit(1)
-    for spec in targets:
-        do_install(spec, client, update=True)
 
 
 def cmd_list(tools: list[ToolSpec]) -> None:
@@ -78,9 +86,9 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
 
         try:
             if spec.type == "url_release":
-                latest = get_url_release_version(spec, client).lstrip("v")
+                latest = get_url_release_version(spec, client).removeprefix("v")
             else:
-                latest = get_latest_tag(spec, client).lstrip("v")
+                latest = get_latest_tag(spec, client).removeprefix("v")
         except Exception as e:
             table.add_row(spec.bin, installed_str, f"[red]error: {e}[/red]", "")
             continue

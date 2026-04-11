@@ -26,6 +26,8 @@ class ToolSpec:
     update_command: str = ""
 
     def __post_init__(self) -> None:
+        if not self.bin:
+            raise ValueError("ToolSpec.bin must not be empty")
         if not self.version_cmd:
             self.version_cmd = [self.bin, "--version"]
         if not self.extract:

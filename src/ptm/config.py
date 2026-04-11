@@ -3,16 +3,13 @@ import sys
 import tomllib
 from pathlib import Path
 
-from rich.console import Console
-
+from ptm.console import console
 from ptm.models import ToolSpec
 
 BIN_DIR = Path(os.environ.get("XDG_BIN_HOME", Path.home() / ".local" / "bin"))
 DEFAULT_TOOLS_TOML = Path(
     os.environ.get("PTM_CONFIG", Path.home() / ".config" / "ptm" / "tools.toml")
 )
-
-console = Console()
 
 
 def load_tools(path: Path) -> list[ToolSpec]:

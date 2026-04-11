@@ -12,7 +12,8 @@ from pathlib import Path
 
 import httpx
 
-from ptm.config import BIN_DIR, console
+from ptm.config import BIN_DIR
+from ptm.console import console
 from ptm.models import ToolSpec
 from ptm.resolver import (
     get_installed_version,
@@ -21,6 +22,10 @@ from ptm.resolver import (
     resolve_asset_url,
     resolve_url_release_url,
 )
+
+
+def _make_executable(path: Path) -> None:
+    path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
 
 def _download(url: str, dest: Path, client: httpx.Client) -> None:
@@ -102,7 +107,7 @@ def _install_tar_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         _extract_binary_from_tar(tmp_path, spec.bin, BIN_DIR)
 
     dest = BIN_DIR / spec.bin
-    dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    _make_executable(dest)
 
 
 def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -116,7 +121,7 @@ def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         with gzip.open(tmp_gz, "rb") as gz_in:
             dest.write_bytes(gz_in.read())
 
-    dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    _make_executable(dest)
 
 
 def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -132,9 +137,7 @@ def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
                     data = zf.read(info.filename)
                     dest = BIN_DIR / spec.bin
                     dest.write_bytes(data)
-                    dest.chmod(
-                        dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-                    )
+                    _make_executable(dest)
                     return
     raise FileNotFoundError(f"{spec.bin} not found in zip archive")
 
@@ -144,7 +147,7 @@ def _install_raw_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
     dest = BIN_DIR / spec.bin
     console.print(f"  Downloading {url}")
     _download(url, dest, client)
-    dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    _make_executable(dest)
 
 
 def _dispatch_extract(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -189,7 +192,8 @@ def _run_installer(spec: ToolSpec, update: bool = False) -> None:
         )
 
 
-def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> None:
+def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> bool:
+    """Install or update a tool. Returns True on success, False on failure."""
     label = "Updating" if update else "Installing"
     console.print(f"[bold cyan]{label} {spec.bin}[/bold cyan]")
     try:
@@ -203,5 +207,7 @@ def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> No
             case _:
                 raise ValueError(f"Unknown type: {spec.type}")
         console.print(f"  [green]Done.[/green] {get_installed_version(spec) or ''}")
+        return True
     except Exception as e:
         console.print(f"  [red]Failed: {e}[/red]")
+        return False

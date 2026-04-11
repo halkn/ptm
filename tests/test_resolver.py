@@ -49,6 +49,9 @@ class TestVersionStatus:
     def test_up_to_date_with_v_prefix(self):
         assert version_status("v1.0.0", "1.0.0") == "[green]up-to-date[/green]"
 
+    def test_up_to_date_does_not_strip_multiple_v(self):
+        assert version_status("vv1.0.0", "1.0.0") == "[yellow]outdated[/yellow]"
+
     def test_outdated(self):
         assert version_status("1.0.0", "1.1.0") == "[yellow]outdated[/yellow]"
 
