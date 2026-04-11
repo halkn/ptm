@@ -18,7 +18,7 @@ console = Console()
 def load_tools(path: Path) -> list[ToolSpec]:
     if not path.exists():
         console.print(f"[red]Config not found: {path}[/red]")
-        console.print(f"[dim]Create it or specify with --config[/dim]")
+        console.print("[dim]Create it or specify with --config[/dim]")
         sys.exit(1)
     with open(path, "rb") as f:
         data = tomllib.load(f)

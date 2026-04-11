@@ -1,4 +1,4 @@
-"""CLI tool manager - install and update tools via GitHub Releases or official installers."""
+"""CLI tool manager - install and update tools via GitHub Releases or official installers."""  # noqa: E501
 
 import argparse
 from pathlib import Path
@@ -11,7 +11,10 @@ from ptm.config import DEFAULT_TOOLS_TOML, load_tools
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="CLI tool manager - install/update tools via GitHub Releases or official installers"
+        description=(
+            "CLI tool manager - install/update tools"
+            " via GitHub Releases or official installers"
+        )
     )
     parser.add_argument(
         "--config",

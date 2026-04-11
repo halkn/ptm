@@ -7,16 +7,16 @@ import subprocess
 import tarfile
 import tempfile
 import zipfile
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import httpx
 
 from ptm.config import BIN_DIR, console
 from ptm.models import ToolSpec
 from ptm.resolver import (
-    get_latest_tag,
     get_installed_version,
+    get_latest_tag,
     get_url_release_version,
     resolve_asset_url,
     resolve_url_release_url,

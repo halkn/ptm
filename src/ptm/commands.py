@@ -85,6 +85,7 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
             table.add_row(spec.bin, installed_str, f"[red]error: {e}[/red]", "")
             continue
 
-        table.add_row(spec.bin, installed_str, latest, version_status(installed, latest))
+        status = version_status(installed, latest)
+        table.add_row(spec.bin, installed_str, latest, status)
 
     console.print(table)
