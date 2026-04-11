@@ -10,14 +10,14 @@ uv tool install git+https://github.com/halkn/ptm
 
 ## 使い方
 
-```
+```text
 ptm [--config PATH] <command> [tool]
 ```
 
 ### コマンド
 
 | コマンド | 説明 |
-|---------|------|
+| --- | --- |
 | `ptm install [tool]` | ツールをインストール（インストール済みはスキップ） |
 | `ptm update [tool]` | ツールを最新バージョンに更新 |
 | `ptm list` | 管理対象ツールと現在のバージョンを一覧表示 |
@@ -42,7 +42,7 @@ ptm check
 ### オプション
 
 | オプション | 説明 |
-|-----------|------|
+| --- | --- |
 | `--config PATH` | 設定ファイルのパスを指定（デフォルト: `~/.config/ptm/tools.toml`） |
 
 ```bash
@@ -52,7 +52,7 @@ ptm --config ~/dotfiles/tools.toml install
 ### 環境変数
 
 | 変数名 | 説明 |
-|--------|------|
+| --- | --- |
 | `PTM_CONFIG` | 設定ファイルのデフォルトパスを変更 |
 | `XDG_BIN_HOME` | バイナリのインストール先（デフォルト: `~/.local/bin`） |
 | `GITHUB_TOKEN` | GitHub API のレート制限緩和用トークン |
@@ -79,7 +79,7 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 ```
 
 | フィールド | 必須 | 説明 |
-|-----------|------|------|
+| --- | --- | --- |
 | `bin` | ✓ | バイナリ名 |
 | `repo` | ✓ | `owner/repo` 形式の GitHub リポジトリ |
 | `platforms` | ✓ | プラットフォームとアセットファイル名のマッピング |
@@ -94,6 +94,7 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 **プラットフォームキー:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
 
 **テンプレート変数:**
+
 - `{tag}` — タグ名（例: `v1.2.3`）
 - `{version}` — `v` を除いたバージョン（例: `1.2.3`）
 
@@ -139,7 +140,7 @@ darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64
 `github_release` と共通のフィールドに加え、以下が使えます。
 
 | フィールド | 必須 | 説明 |
-|-----------|------|------|
+| --- | --- | --- |
 | `version_url` | | 最新バージョンを取得する URL |
 | `version_url_regex` | | `version_url` のレスポンスからバージョンを抽出する正規表現 |
 
@@ -166,7 +167,7 @@ version_regex = 'markdownlint-cli2 v([\d.]+)'
 ```
 
 | フィールド | 必須 | 説明 |
-|-----------|------|------|
+| --- | --- | --- |
 | `bin` | ✓ | バイナリ名 |
 | `url` | | インストールスクリプトの URL（`curl \| sh` で実行） |
 | `command` | | インストール時に実行するシェルコマンド |
