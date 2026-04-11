@@ -1,6 +1,21 @@
-.venv/
+# Python
 __pycache__/
 *.pyc
 *.pyo
+
+# uv
+.venv/
+
+# Build
 dist/
 *.egg-info/
+
+# Test / Coverage
+.coverage
+.pytest_cache/
+
+# Tools
+.ruff_cache/
+
+# Claude Code
+.claude/
