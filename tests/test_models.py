@@ -68,3 +68,13 @@ class TestToolSpecFromDict:
     def test_type_field_is_set(self):
         spec = ToolSpec.from_dict({"bin": "rg", "type": "github_release"})
         assert spec.type == "github_release"
+
+
+class TestToolSpecNpm:
+    def test_defaults_package_to_bin(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        assert spec.package == "markdownlint-cli2"
+
+    def test_preserves_explicit_package(self):
+        spec = ToolSpec(bin="tsc", type="npm", package="typescript")
+        assert spec.package == "typescript"

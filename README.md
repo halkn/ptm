@@ -61,7 +61,7 @@ ptm --config ~/dotfiles/tools.toml install
 
 `~/.config/ptm/tools.toml` に管理するツールを定義します。
 
-ツールは3種類の方法で管理できます。
+ツールは4種類の方法で管理できます。
 
 ---
 
@@ -158,12 +158,6 @@ bin = "uv"
 url = "https://astral.sh/uv/install.sh"
 update_command = "uv self update"
 version_regex = 'uv ([\d.]+)'
-
-[[installer]]
-bin = "markdownlint-cli2"
-command = "npm install -g markdownlint-cli2"
-update_command = "npm update -g markdownlint-cli2"
-version_regex = 'markdownlint-cli2 v([\d.]+)'
 ```
 
 | フィールド | 必須 | 説明 |
@@ -174,6 +168,31 @@ version_regex = 'markdownlint-cli2 v([\d.]+)'
 | `update_command` | | 更新時に実行するコマンド（省略時は `command` を使用） |
 
 `url` と `command` はいずれか一方を指定します。
+
+---
+
+### `[[npm]]` — npm グローバルパッケージ
+
+`npm install -g` / `npm update -g` で管理したいツールに使用します。
+
+```toml
+[[npm]]
+bin = "markdownlint-cli2"
+version_regex = 'markdownlint-cli2 v([\d.]+)'
+
+[[npm]]
+bin = "tsc"
+package = "typescript"
+version_cmd = ["tsc", "--version"]
+version_regex = 'Version ([\d.]+)'
+```
+
+| フィールド | 必須 | 説明 |
+| --- | --- | --- |
+| `bin` | ✓ | バイナリ名 |
+| `package` | | npm パッケージ名（省略時は `bin` を使用） |
+| `version_cmd` | | バージョン確認コマンド（デフォルト: `[bin, "--version"]`） |
+| `version_regex` | | バージョン文字列を抽出する正規表現 |
 
 ---
 

@@ -74,8 +74,8 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
         installed = get_installed_version(spec)
         installed_str = installed or "[red]not installed[/red]"
 
-        if spec.type == "installer":
-            table.add_row(spec.bin, installed_str, "-", "[dim]installer[/dim]")
+        if spec.type in {"installer", "npm"}:
+            table.add_row(spec.bin, installed_str, "-", f"[dim]{spec.type}[/dim]")
             continue
 
         if spec.version == "nightly":
