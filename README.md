@@ -193,5 +193,5 @@ uv run ruff check src/
 uv run ruff format src/
 
 # 型チェック
-uv run ty check src/
+uv run ty check src tests
 ```

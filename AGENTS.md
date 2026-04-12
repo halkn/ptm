@@ -10,7 +10,7 @@
 - `uv run pytest`: カバレッジ付きでテストを実行します。
 - `uv run ruff check src tests`: Lint と import 順序を検査します。
 - `uv run ruff format src tests`: コードを整形します。
-- `uv run ty check src`: 型チェックを実行します。
+- `uv run ty check src tests`: 型チェックを実行します。
 - `uv run ptm list`: CLI の簡易動作確認を行います。
 
 ## コーディング規約
