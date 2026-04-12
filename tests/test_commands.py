@@ -1,3 +1,4 @@
+from typing import NotRequired, TypedDict, Unpack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -6,9 +7,20 @@ from ptm.commands import cmd_check, cmd_install, cmd_list, cmd_update
 from ptm.models import ToolSpec
 
 
-def _make_spec(**kwargs) -> ToolSpec:
-    defaults = {"bin": "rg", "type": "github_release", "repo": "BurntSushi/ripgrep"}
-    return ToolSpec(**{**defaults, **kwargs})
+class ToolSpecOverrides(TypedDict):
+    bin: NotRequired[str]
+    type: NotRequired[str]
+    version: NotRequired[str]
+    repo: NotRequired[str]
+    command: NotRequired[str]
+    version_url: NotRequired[str]
+
+
+def _make_spec(**kwargs: Unpack[ToolSpecOverrides]) -> ToolSpec:
+    spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
+    for key, value in kwargs.items():
+        setattr(spec, key, value)
+    return spec
 
 
 # ---- cmd_install ------------------------------------------------------------

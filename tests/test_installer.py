@@ -3,6 +3,7 @@ import io
 import stat
 import tarfile
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -25,7 +26,9 @@ from ptm.models import ToolSpec
 # ---- helpers ----------------------------------------------------------------
 
 
-def _make_client_that_writes(content: bytes) -> MagicMock:
+def _make_client_that_writes(
+    content: bytes,
+) -> tuple[MagicMock, Callable[[str, Path, MagicMock], None]]:
     """_download が呼ばれると dest にコンテンツを書き込む client を返す。"""
 
     def fake_download(url: str, dest: Path, client: MagicMock) -> None:
