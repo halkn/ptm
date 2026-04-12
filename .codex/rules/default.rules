@@ -1,0 +1,23 @@
+# Allow common Git/GitHub publish flows for this repository without a prompt.
+
+prefix_rule(
+    pattern = ["git", "push"],
+    decision = "allow",
+    justification = "Allow pushing the current branch to a remote without an approval prompt.",
+    match = [
+        "git push",
+        "git push -u origin feature/example",
+    ],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", ["create", "view", "edit", "status"]],
+    decision = "allow",
+    justification = "Allow common pull request operations without an approval prompt.",
+    match = [
+        "gh pr create --fill",
+        "gh pr view 2",
+        "gh pr edit 2 --title docs",
+        "gh pr status",
+    ],
+)
