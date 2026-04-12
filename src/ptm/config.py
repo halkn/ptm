@@ -26,4 +26,6 @@ def load_tools(path: Path) -> list[ToolSpec]:
         tools.append(ToolSpec.from_dict({**t, "type": "url_release"}))
     for t in data.get("installer", []):
         tools.append(ToolSpec.from_dict({**t, "type": "installer"}))
+    for t in data.get("npm", []):
+        tools.append(ToolSpec.from_dict({**t, "type": "npm"}))
     return tools

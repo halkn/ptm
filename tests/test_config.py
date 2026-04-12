@@ -40,12 +40,15 @@ def test_load_tools_all_types(tmp_path: Path):
         [[installer]]
         bin = "uv"
         url = "https://astral.sh/uv/install.sh"
+
+        [[npm]]
+        bin = "markdownlint-cli2"
         """)
     )
     tools = load_tools(toml)
-    assert len(tools) == 3
+    assert len(tools) == 4
     types = {t.type for t in tools}
-    assert types == {"github_release", "url_release", "installer"}
+    assert types == {"github_release", "url_release", "installer", "npm"}
 
 
 def test_load_tools_exits_when_file_not_found(tmp_path: Path):

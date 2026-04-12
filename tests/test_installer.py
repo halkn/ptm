@@ -18,6 +18,7 @@ from ptm.installer import (
     _install_tar_binary,
     _install_zip_binary,
     _run_installer,
+    _run_npm_install,
     _strip_components,
     do_install,
 )
@@ -310,6 +311,35 @@ class TestRunInstaller:
         assert "https://astral.sh/uv/install.sh" in args
 
 
+class TestRunNpmInstall:
+    def test_runs_npm_install(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        with patch("subprocess.run") as mock_run:
+            _run_npm_install(spec)
+        mock_run.assert_called_once_with(
+            ["npm", "install", "-g", "markdownlint-cli2"],
+            check=True,
+        )
+
+    def test_runs_npm_update_when_updating(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        with patch("subprocess.run") as mock_run:
+            _run_npm_install(spec, update=True)
+        mock_run.assert_called_once_with(
+            ["npm", "update", "-g", "markdownlint-cli2"],
+            check=True,
+        )
+
+    def test_uses_package_name_when_set(self):
+        spec = ToolSpec(bin="tsc", type="npm", package="typescript")
+        with patch("subprocess.run") as mock_run:
+            _run_npm_install(spec)
+        mock_run.assert_called_once_with(
+            ["npm", "install", "-g", "typescript"],
+            check=True,
+        )
+
+
 # ---- _dispatch_extract ------------------------------------------------------
 
 
@@ -381,6 +411,16 @@ class TestDoInstall:
         ):
             do_install(spec, client, update=True)
         mock_run.assert_called_once_with(spec, update=True)
+
+    def test_runs_npm_installer(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        client = MagicMock()
+        with (
+            patch("ptm.installer._run_npm_install") as mock_run,
+            patch("ptm.installer.get_installed_version", return_value="0.15.0"),
+        ):
+            do_install(spec, client)
+        mock_run.assert_called_once_with(spec, update=False)
 
     def test_prints_error_on_failure(self, capsys: pytest.CaptureFixture):
         spec = ToolSpec(bin="rg", type="github_release")

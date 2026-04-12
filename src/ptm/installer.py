@@ -192,6 +192,13 @@ def _run_installer(spec: ToolSpec, update: bool = False) -> None:
         )
 
 
+def _run_npm_install(spec: ToolSpec, update: bool = False) -> None:
+    action = "update" if update else "install"
+    cmd = ["npm", action, "-g", spec.package]
+    console.print(f"  Running: {shlex.join(cmd)}")
+    subprocess.run(cmd, check=True)
+
+
 def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> bool:
     """Install or update a tool. Returns True on success, False on failure."""
     label = "Updating" if update else "Installing"
@@ -204,6 +211,8 @@ def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> bo
                 _install_url_release(spec, client)
             case "installer":
                 _run_installer(spec, update=update)
+            case "npm":
+                _run_npm_install(spec, update=update)
             case _:
                 raise ValueError(f"Unknown type: {spec.type}")
         console.print(f"  [green]Done.[/green] {get_installed_version(spec) or ''}")

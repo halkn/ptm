@@ -141,6 +141,16 @@ class TestCmdCheck:
             cmd_check(tools, client)
         mock_tag.assert_not_called()
 
+    def test_npm_type_skips_version_fetch(self):
+        tools = [ToolSpec(bin="markdownlint-cli2", type="npm")]
+        client = MagicMock()
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.15.0"),
+            patch("ptm.commands.get_latest_tag") as mock_tag,
+        ):
+            cmd_check(tools, client)
+        mock_tag.assert_not_called()
+
     def test_nightly_skips_version_fetch(self):
         tools = [_make_spec(bin="nvim", version="nightly")]
         client = MagicMock()

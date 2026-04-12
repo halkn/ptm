@@ -4,7 +4,8 @@ from dataclasses import dataclass, field
 @dataclass
 class ToolSpec:
     bin: str = ""
-    type: str = "github_release"  # "github_release" | "url_release" | "installer"
+    # "github_release" | "url_release" | "installer" | "npm"
+    type: str = "github_release"
     version: str = "latest"
     version_cmd: list[str] = field(default_factory=list)
     version_regex: str = r"(\S+)"
@@ -24,12 +25,16 @@ class ToolSpec:
     url: str = ""
     command: str = ""
     update_command: str = ""
+    # npm 専用
+    package: str = ""
 
     def __post_init__(self) -> None:
         if not self.bin:
             raise ValueError("ToolSpec.bin must not be empty")
         if not self.version_cmd:
             self.version_cmd = [self.bin, "--version"]
+        if self.type == "npm" and not self.package:
+            self.package = self.bin
         if not self.extract:
             self.extract = self._infer_extract()
 
