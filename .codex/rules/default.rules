@@ -1,6 +1,12 @@
 # Allow common Git/GitHub publish flows for this repository without a prompt.
 
 prefix_rule(
+    pattern = ["git", "push", ["-f", "--force", "--force-with-lease"]],
+    decision = "forbidden",
+    justification = "Force push is not allowed; use a regular `git push` instead.",
+)
+
+prefix_rule(
     pattern = ["git", "push"],
     decision = "allow",
     justification = "Allow pushing the current branch to a remote without an approval prompt.",
