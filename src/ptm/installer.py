@@ -19,7 +19,7 @@ from ptm.resolver import (
     get_installed_version,
     get_latest_tag,
     get_url_release_version,
-    resolve_asset_url,
+    resolve_github_release_asset,
     resolve_url_release_url,
 )
 
@@ -150,8 +150,11 @@ def _install_raw_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
     _make_executable(dest)
 
 
-def _dispatch_extract(spec: ToolSpec, url: str, client: httpx.Client) -> None:
-    match spec.extract:
+def _dispatch_extract(
+    spec: ToolSpec, url: str, client: httpx.Client, extract: str | None = None
+) -> None:
+    resolved_extract = extract or spec.extract
+    match resolved_extract:
         case "tar":
             _install_tar(spec, url, client)
         case "tar_binary" | "tar_xz_binary":
@@ -163,13 +166,13 @@ def _dispatch_extract(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         case "raw_binary":
             _install_raw_binary(spec, url, client)
         case _:
-            raise ValueError(f"Unknown extract type: {spec.extract}")
+            raise ValueError(f"Unknown extract type: {resolved_extract}")
 
 
 def _install_github_release(spec: ToolSpec, client: httpx.Client) -> None:
     tag = get_latest_tag(spec, client)
-    url = resolve_asset_url(spec, tag)
-    _dispatch_extract(spec, url, client)
+    asset = resolve_github_release_asset(spec, tag, client)
+    _dispatch_extract(spec, asset.url, client, extract=asset.extract)
 
 
 def _install_url_release(spec: ToolSpec, client: httpx.Client) -> None:
