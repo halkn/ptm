@@ -7,9 +7,8 @@ from ptm.console import console
 from ptm.installer import do_install
 from ptm.models import ToolSpec
 from ptm.resolver import (
+    get_comparable_latest_version,
     get_installed_version,
-    get_latest_tag,
-    get_url_release_version,
     version_status,
 )
 
@@ -42,10 +41,27 @@ def cmd_install(
 def cmd_update(tools: list[ToolSpec], target: str | None, client: httpx.Client) -> None:
     failed = False
     for spec in _filter_tools(tools, target):
+        installed = get_installed_version(spec)
+        if _is_up_to_date(spec, installed, client):
+            console.print(
+                f"[dim]  {spec.bin}: already up-to-date ({installed}), skipping[/dim]"
+            )
+            continue
         if not do_install(spec, client, update=True):
             failed = True
     if failed:
         sys.exit(1)
+
+
+def _is_up_to_date(
+    spec: ToolSpec, installed: str | None, client: httpx.Client
+) -> bool:
+    if installed is None:
+        return False
+    latest = get_comparable_latest_version(spec, client)
+    if latest is None:
+        return False
+    return version_status(installed, latest) == "[green]up-to-date[/green]"
 
 
 def cmd_list(tools: list[ToolSpec]) -> None:
@@ -85,12 +101,13 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
             continue
 
         try:
-            if spec.type == "url_release":
-                latest = get_url_release_version(spec, client).removeprefix("v")
-            else:
-                latest = get_latest_tag(spec, client).removeprefix("v")
+            latest = get_comparable_latest_version(spec, client)
         except Exception as e:
             table.add_row(spec.bin, installed_str, f"[red]error: {e}[/red]", "")
+            continue
+
+        if latest is None:
+            table.add_row(spec.bin, installed_str, "-", "")
             continue
 
         status = version_status(installed, latest)

@@ -82,7 +82,10 @@ class TestCmdUpdate:
     def test_updates_all_tools(self):
         tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
         client = MagicMock()
-        with patch("ptm.commands.do_install") as mock_do:
+        with (
+            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.do_install") as mock_do,
+        ):
             cmd_update(tools, None, client)
         assert mock_do.call_count == 2
         for c in mock_do.call_args_list:
@@ -91,7 +94,10 @@ class TestCmdUpdate:
     def test_updates_only_specified_target(self):
         tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
         client = MagicMock()
-        with patch("ptm.commands.do_install") as mock_do:
+        with (
+            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.do_install") as mock_do,
+        ):
             cmd_update(tools, "rg", client)
         assert mock_do.call_count == 1
         assert mock_do.call_args[0][0].bin == "rg"
@@ -101,6 +107,39 @@ class TestCmdUpdate:
         client = MagicMock()
         with pytest.raises(SystemExit):
             cmd_update(tools, "nonexistent", client)
+
+    def test_skips_up_to_date_github_release(self):
+        tools = [_make_spec(bin="rg", version="latest")]
+        client = MagicMock()
+        with (
+            patch("ptm.commands.get_installed_version", return_value="14.1.0"),
+            patch("ptm.commands.get_comparable_latest_version", return_value="14.1.0"),
+            patch("ptm.commands.do_install") as mock_do,
+        ):
+            cmd_update(tools, None, client)
+        mock_do.assert_not_called()
+
+    def test_skips_up_to_date_url_release(self):
+        tools = [ToolSpec(bin="node", type="url_release", version_url="https://nodejs.org")]
+        client = MagicMock()
+        with (
+            patch("ptm.commands.get_installed_version", return_value="22.0.0"),
+            patch("ptm.commands.get_comparable_latest_version", return_value="22.0.0"),
+            patch("ptm.commands.do_install") as mock_do,
+        ):
+            cmd_update(tools, None, client)
+        mock_do.assert_not_called()
+
+    def test_updates_outdated_tool(self):
+        tools = [_make_spec(bin="rg", version="latest")]
+        client = MagicMock()
+        with (
+            patch("ptm.commands.get_installed_version", return_value="14.0.0"),
+            patch("ptm.commands.get_comparable_latest_version", return_value="14.1.0"),
+            patch("ptm.commands.do_install") as mock_do,
+        ):
+            cmd_update(tools, None, client)
+        mock_do.assert_called_once_with(tools[0], client, update=True)
 
 
 # ---- cmd_list ---------------------------------------------------------------
@@ -127,7 +166,7 @@ class TestCmdCheck:
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="14.1.0"),
-            patch("ptm.commands.get_latest_tag", return_value="14.1.0"),
+            patch("ptm.commands.get_comparable_latest_version", return_value="14.1.0"),
         ):
             cmd_check(tools, client)
 
@@ -136,30 +175,30 @@ class TestCmdCheck:
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="0.5.0"),
-            patch("ptm.commands.get_latest_tag") as mock_tag,
+            patch("ptm.commands.get_comparable_latest_version") as mock_latest,
         ):
             cmd_check(tools, client)
-        mock_tag.assert_not_called()
+        mock_latest.assert_not_called()
 
     def test_npm_type_skips_version_fetch(self):
         tools = [ToolSpec(bin="markdownlint-cli2", type="npm")]
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="0.15.0"),
-            patch("ptm.commands.get_latest_tag") as mock_tag,
+            patch("ptm.commands.get_comparable_latest_version") as mock_latest,
         ):
             cmd_check(tools, client)
-        mock_tag.assert_not_called()
+        mock_latest.assert_not_called()
 
     def test_nightly_skips_version_fetch(self):
         tools = [_make_spec(bin="nvim", version="nightly")]
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="0.10.0-dev"),
-            patch("ptm.commands.get_latest_tag") as mock_tag,
+            patch("ptm.commands.get_comparable_latest_version") as mock_latest,
         ):
             cmd_check(tools, client)
-        mock_tag.assert_not_called()
+        mock_latest.assert_not_called()
 
     def test_url_release_fetches_url_version(self):
         tools = [
@@ -168,7 +207,7 @@ class TestCmdCheck:
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="22.0.0"),
-            patch("ptm.commands.get_url_release_version", return_value="v22.0.0"),
+            patch("ptm.commands.get_comparable_latest_version", return_value="22.0.0"),
         ):
             cmd_check(tools, client)
 
@@ -177,6 +216,9 @@ class TestCmdCheck:
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="14.0.0"),
-            patch("ptm.commands.get_latest_tag", side_effect=RuntimeError("API error")),
+            patch(
+                "ptm.commands.get_comparable_latest_version",
+                side_effect=RuntimeError("API error"),
+            ),
         ):
             cmd_check(tools, client)  # 例外が外に漏れないこと

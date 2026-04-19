@@ -7,6 +7,7 @@ from ptm.models import ToolSpec
 from ptm.resolver import (
     _github_headers,
     detect_platform,
+    get_comparable_latest_version,
     get_installed_version,
     get_latest_tag,
     get_url_release_version,
@@ -135,6 +136,30 @@ class TestGetUrlReleaseVersion:
         client.get.return_value.text = "no version here"
         with pytest.raises(RuntimeError, match="Version not found"):
             get_url_release_version(spec, client)
+
+
+class TestGetComparableLatestVersion:
+    def test_returns_none_for_installer(self):
+        spec = ToolSpec(bin="uv", type="installer", command="install.sh")
+        client = MagicMock()
+        assert get_comparable_latest_version(spec, client) is None
+
+    def test_returns_none_for_nightly(self):
+        spec = ToolSpec(bin="nvim", version="nightly")
+        client = MagicMock()
+        assert get_comparable_latest_version(spec, client) is None
+
+    def test_fetches_github_release_version(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", version="latest")
+        client = MagicMock()
+        with patch("ptm.resolver.get_latest_tag", return_value="v14.1.0"):
+            assert get_comparable_latest_version(spec, client) == "14.1.0"
+
+    def test_fetches_url_release_version(self):
+        spec = ToolSpec(bin="node", type="url_release", version_url="https://nodejs.org")
+        client = MagicMock()
+        with patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"):
+            assert get_comparable_latest_version(spec, client) == "22.0.0"
 
 
 class TestResolveAssetUrl:
