@@ -120,7 +120,9 @@ class TestCmdUpdate:
         mock_do.assert_not_called()
 
     def test_skips_up_to_date_url_release(self):
-        tools = [ToolSpec(bin="node", type="url_release", version_url="https://nodejs.org")]
+        tools = [
+            ToolSpec(bin="node", type="url_release", version_url="https://nodejs.org")
+        ]
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="22.0.0"),

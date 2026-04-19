@@ -201,7 +201,9 @@ class TestGetComparableLatestVersion:
             assert get_comparable_latest_version(spec, client) == "14.1.0"
 
     def test_fetches_url_release_version(self):
-        spec = ToolSpec(bin="node", type="url_release", version_url="https://nodejs.org")
+        spec = ToolSpec(
+            bin="node", type="url_release", version_url="https://nodejs.org"
+        )
         client = MagicMock()
         with patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"):
             assert get_comparable_latest_version(spec, client) == "22.0.0"
