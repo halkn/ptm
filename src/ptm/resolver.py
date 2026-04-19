@@ -1,4 +1,3 @@
-import os
 import platform
 import re
 import subprocess
@@ -45,19 +44,35 @@ def get_comparable_latest_version(
     return get_latest_tag(spec, client).removeprefix("v")
 
 
-def _github_headers() -> dict[str, str]:
-    headers: dict[str, str] = {"Accept": "application/vnd.github+json"}
-    token = os.environ.get("GITHUB_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    return headers
+def _get_latest_tag_via_gh(spec: ToolSpec) -> str | None:
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "api",
+                f"repos/{spec.repo}/releases/latest",
+                "--jq",
+                ".tag_name",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+    tag = result.stdout.strip()
+    return tag or None
 
 
 def get_latest_tag(spec: ToolSpec, client: httpx.Client) -> str:
     if spec.version != "latest":
         return spec.version
+    gh_tag = _get_latest_tag_via_gh(spec)
+    if gh_tag is not None:
+        return gh_tag
     url = f"https://api.github.com/repos/{spec.repo}/releases/latest"
-    resp = client.get(url, headers=_github_headers())
+    resp = client.get(url, headers={"Accept": "application/vnd.github+json"})
     resp.raise_for_status()
     return resp.json()["tag_name"]
 

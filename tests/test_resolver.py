@@ -5,7 +5,7 @@ import pytest
 
 from ptm.models import ToolSpec
 from ptm.resolver import (
-    _github_headers,
+    _get_latest_tag_via_gh,
     detect_platform,
     get_comparable_latest_version,
     get_installed_version,
@@ -82,17 +82,30 @@ class TestGetInstalledVersion:
             assert get_installed_version(spec) == "unknown"
 
 
-class TestGithubHeaders:
-    def test_no_token(self):
-        with patch.dict("os.environ", {}, clear=True):
-            headers = _github_headers()
-        assert "Authorization" not in headers
-        assert headers["Accept"] == "application/vnd.github+json"
+class TestGetLatestTagViaGh:
+    def test_returns_tag_when_gh_succeeds(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep")
+        completed = subprocess.CompletedProcess(
+            args=[],
+            returncode=0,
+            stdout="14.1.0\n",
+            stderr="",
+        )
+        with patch("subprocess.run", return_value=completed):
+            assert _get_latest_tag_via_gh(spec) == "14.1.0"
 
-    def test_with_token(self):
-        with patch.dict("os.environ", {"GITHUB_TOKEN": "mytoken"}):
-            headers = _github_headers()
-        assert headers["Authorization"] == "Bearer mytoken"
+    def test_returns_none_when_gh_is_missing(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep")
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            assert _get_latest_tag_via_gh(spec) is None
+
+    def test_returns_none_when_gh_auth_fails(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep")
+        with patch(
+            "subprocess.run",
+            side_effect=subprocess.CalledProcessError(1, ["gh", "api"]),
+        ):
+            assert _get_latest_tag_via_gh(spec) is None
 
 
 class TestGetLatestTag:
@@ -102,11 +115,19 @@ class TestGetLatestTag:
         assert get_latest_tag(spec, client) == "v14.0.0"
         client.get.assert_not_called()
 
-    def test_fetches_tag_from_api(self):
+    def test_fetches_tag_from_gh_when_available(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", version="latest")
+        client = MagicMock()
+        with patch("ptm.resolver._get_latest_tag_via_gh", return_value="14.1.0"):
+            assert get_latest_tag(spec, client) == "14.1.0"
+        client.get.assert_not_called()
+
+    def test_falls_back_to_api_when_gh_is_unavailable(self):
         spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", version="latest")
         client = MagicMock()
         client.get.return_value.json.return_value = {"tag_name": "14.1.0"}
-        assert get_latest_tag(spec, client) == "14.1.0"
+        with patch("ptm.resolver._get_latest_tag_via_gh", return_value=None):
+            assert get_latest_tag(spec, client) == "14.1.0"
 
 
 class TestGetUrlReleaseVersion:
