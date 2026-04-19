@@ -55,7 +55,8 @@ ptm --config ~/dotfiles/tools.toml install
 | --- | --- |
 | `PTM_CONFIG` | 設定ファイルのデフォルトパスを変更 |
 | `XDG_BIN_HOME` | バイナリのインストール先（デフォルト: `~/.local/bin`） |
-| `GITHUB_TOKEN` | GitHub API のレート制限緩和用トークン |
+
+GitHub Releases の取得では `gh` コマンドを優先します。`gh auth login` 済みであれば、その認証情報を使って `gh api` 経由で release 情報を取得します。`gh` が未インストール、または未ログインの場合は GitHub REST API へフォールバックします。
 
 ## 設定ファイル
 
