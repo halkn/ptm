@@ -35,6 +35,16 @@ def version_status(installed: str | None, latest: str) -> str:
     return "[yellow]outdated[/yellow]"
 
 
+def get_comparable_latest_version(
+    spec: ToolSpec, client: httpx.Client
+) -> str | None:
+    if spec.type in {"installer", "npm"} or spec.version == "nightly":
+        return None
+    if spec.type == "url_release":
+        return get_url_release_version(spec, client).removeprefix("v")
+    return get_latest_tag(spec, client).removeprefix("v")
+
+
 def _github_headers() -> dict[str, str]:
     headers: dict[str, str] = {"Accept": "application/vnd.github+json"}
     token = os.environ.get("GITHUB_TOKEN")
