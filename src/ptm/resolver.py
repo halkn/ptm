@@ -271,17 +271,26 @@ def resolve_asset_url(spec: ToolSpec, tag: str, client: httpx.Client) -> str:
     return resolve_github_release_asset(spec, tag, client).url
 
 
-def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
+def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
     if not spec.platforms:
-        return _resolve_known_url_release_url(spec, version)
+        return _resolve_known_url_release_asset(spec, version)
     template = _get_platform_template(spec)
-    v = version.removeprefix("v")
-    return template.replace("{version}", v).replace("{tag}", version)
+    normalized_version = version.removeprefix("v")
+    url = template.replace("{version}", normalized_version).replace("{tag}", version)
+    return ResolvedAsset(
+        name=url.rsplit("/", maxsplit=1)[-1],
+        url=url,
+        extract=_infer_extract_type(url, spec.opt_dir),
+    )
 
 
-def _resolve_known_url_release_url(spec: ToolSpec, version: str) -> str:
+def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
+    return resolve_url_release_asset(spec, version).url
+
+
+def _resolve_known_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
     if _uses_node_dist_index(spec):
-        return _resolve_node_dist_url(version)
+        return _resolve_node_dist_asset(version, spec.opt_dir)
     raise RuntimeError(
         f"{spec.bin}: no URL template for platform '{detect_platform()}'; "
         "set [tools.<name>.platforms] to configure explicit download URLs"
@@ -294,7 +303,7 @@ def _uses_node_dist_index(spec: ToolSpec) -> bool:
     )
 
 
-def _resolve_node_dist_url(version: str) -> str:
+def _resolve_node_dist_asset(version: str, opt_dir: str) -> ResolvedAsset:
     platform_key = detect_platform()
     platform_alias = _NODE_DIST_PLATFORM_ALIASES.get(platform_key)
     if platform_alias is None:
@@ -305,4 +314,9 @@ def _resolve_node_dist_url(version: str) -> str:
     normalized_version = version.removeprefix("v")
     version_tag = f"v{normalized_version}"
     filename = f"node-{version_tag}-{platform_alias}.tar.xz"
-    return f"https://nodejs.org/dist/{version_tag}/{filename}"
+    url = f"https://nodejs.org/dist/{version_tag}/{filename}"
+    return ResolvedAsset(
+        name=filename,
+        url=url,
+        extract=_infer_extract_type(filename, opt_dir),
+    )

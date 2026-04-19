@@ -15,6 +15,7 @@ from ptm.resolver import (
     get_url_release_version,
     resolve_asset_url,
     resolve_github_release_asset,
+    resolve_url_release_asset,
     resolve_url_release_url,
     version_status,
 )
@@ -389,6 +390,18 @@ class TestResolveUrlReleaseUrl:
         with patch("ptm.resolver.detect_platform", return_value="darwin-arm64"):
             url = resolve_url_release_url(spec, "v22.0.0")
         assert url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-darwin-arm64.tar.xz"
+
+    def test_resolves_node_dist_asset_with_tar_extract(self):
+        spec = ToolSpec(
+            bin="node",
+            type="url_release",
+            version_url="https://nodejs.org/dist/index.json",
+            opt_dir="~/.local/opt/node",
+        )
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            asset = resolve_url_release_asset(spec, "v22.0.0")
+        assert asset.name == "node-v22.0.0-linux-x64.tar.xz"
+        assert asset.extract == "tar"
 
     def test_raises_for_unknown_url_release_without_platforms(self):
         spec = ToolSpec(
