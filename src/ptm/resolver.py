@@ -43,9 +43,7 @@ def get_npm_latest_version(spec: ToolSpec) -> str:
     return out.strip().removeprefix("v")
 
 
-def get_comparable_latest_version(
-    spec: ToolSpec, client: httpx.Client
-) -> str | None:
+def get_comparable_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
     if spec.version == "nightly":
         return None
     if spec.type == "installer":

@@ -53,9 +53,7 @@ def cmd_update(tools: list[ToolSpec], target: str | None, client: httpx.Client) 
         sys.exit(1)
 
 
-def _is_up_to_date(
-    spec: ToolSpec, installed: str | None, client: httpx.Client
-) -> bool:
+def _is_up_to_date(spec: ToolSpec, installed: str | None, client: httpx.Client) -> bool:
     if installed is None:
         return False
     latest = get_comparable_latest_version(spec, client)
