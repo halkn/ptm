@@ -20,7 +20,7 @@ from ptm.resolver import (
     get_latest_tag,
     get_url_release_version,
     resolve_github_release_asset,
-    resolve_url_release_url,
+    resolve_url_release_asset,
 )
 
 
@@ -177,8 +177,8 @@ def _install_github_release(spec: ToolSpec, client: httpx.Client) -> None:
 
 def _install_url_release(spec: ToolSpec, client: httpx.Client) -> None:
     version = get_url_release_version(spec, client)
-    url = resolve_url_release_url(spec, version)
-    _dispatch_extract(spec, url, client)
+    asset = resolve_url_release_asset(spec, version)
+    _dispatch_extract(spec, asset.url, client, extract=asset.extract)
 
 
 def _run_installer(spec: ToolSpec, update: bool = False) -> None:
