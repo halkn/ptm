@@ -367,6 +367,18 @@ class TestDispatchExtract:
         with pytest.raises(ValueError, match="Unknown extract type"):
             _dispatch_extract(spec, "https://example.com", MagicMock())
 
+    def test_override_extract_takes_precedence(self):
+        spec = ToolSpec(bin="tool", extract="raw_binary")
+        client = MagicMock()
+        with patch("ptm.installer._install_zip_binary") as mock_fn:
+            _dispatch_extract(
+                spec,
+                "https://example.com/tool.zip",
+                client,
+                extract="zip_binary",
+            )
+        mock_fn.assert_called_once()
+
 
 # ---- do_install -------------------------------------------------------------
 

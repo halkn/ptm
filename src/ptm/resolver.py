@@ -1,10 +1,39 @@
 import platform
 import re
 import subprocess
+from dataclasses import dataclass
+from urllib.parse import quote
 
 import httpx
 
 from ptm.models import ToolSpec
+
+
+@dataclass(frozen=True)
+class ResolvedAsset:
+    name: str
+    url: str
+    extract: str
+
+
+_OS_TOKENS: dict[str, tuple[str, ...]] = {
+    "linux": ("linux",),
+    "darwin": ("darwin", "macos", "osx", "apple-darwin"),
+}
+_ARCH_TOKENS: dict[str, tuple[str, ...]] = {
+    "x86_64": ("x86_64", "amd64", "x64"),
+    "arm64": ("arm64", "aarch64"),
+}
+_EXCLUDED_ASSET_TOKENS = (
+    "checksums",
+    "checksum",
+    "sha256",
+    "sha512",
+    "provenance",
+    "sbom",
+    ".sig",
+    ".asc",
+)
 
 
 def detect_platform() -> str:
@@ -110,11 +139,130 @@ def _get_platform_template(spec: ToolSpec) -> str:
     return template
 
 
-def resolve_asset_url(spec: ToolSpec, tag: str) -> str:
-    template = _get_platform_template(spec)
-    version = tag.removeprefix("v")
-    asset = template.replace("{tag}", tag).replace("{version}", version)
-    return f"https://github.com/{spec.repo}/releases/download/{tag}/{asset}"
+def resolve_github_release_asset(
+    spec: ToolSpec, tag: str, client: httpx.Client
+) -> ResolvedAsset:
+    if spec.platforms:
+        template = _get_platform_template(spec)
+        version = tag.removeprefix("v")
+        asset = template.replace("{tag}", tag).replace("{version}", version)
+        return ResolvedAsset(
+            name=asset,
+            url=f"https://github.com/{spec.repo}/releases/download/{tag}/{asset}",
+            extract=_infer_extract_type(asset, spec.opt_dir),
+        )
+    return _resolve_github_release_asset_automatically(spec, tag, client)
+
+
+def _resolve_github_release_asset_automatically(
+    spec: ToolSpec, tag: str, client: httpx.Client
+) -> ResolvedAsset:
+    release = _get_github_release(spec, tag, client)
+    raw_assets = release.get("assets", [])
+    if not isinstance(raw_assets, list):
+        raise RuntimeError(f"{spec.bin}: invalid release assets payload")
+
+    scored_assets: list[tuple[int, ResolvedAsset]] = []
+    for raw_asset in raw_assets:
+        if not isinstance(raw_asset, dict):
+            continue
+        asset = {str(key): value for key, value in raw_asset.items()}
+        name = asset.get("name")
+        download_url = asset.get("browser_download_url")
+        if not isinstance(name, str) or not isinstance(download_url, str):
+            continue
+        score = _score_asset_name(spec, name)
+        if score is None:
+            continue
+        scored_assets.append(
+            (
+                score,
+                ResolvedAsset(
+                    name=name,
+                    url=download_url,
+                    extract=_infer_extract_type(name, spec.opt_dir),
+                ),
+            )
+        )
+
+    if not scored_assets:
+        platform_key = detect_platform()
+        raise RuntimeError(
+            f"{spec.bin}: no release asset matched platform '{platform_key}'; "
+            "set [tools.<name>.platforms] to override asset selection"
+        )
+
+    scored_assets.sort(key=lambda item: (-item[0], item[1].name))
+    best_score, best_asset = scored_assets[0]
+    tied_assets = [asset.name for score, asset in scored_assets if score == best_score]
+    if len(tied_assets) > 1:
+        platform_key = detect_platform()
+        candidates = ", ".join(tied_assets)
+        raise RuntimeError(
+            f"{spec.bin}: multiple release assets matched platform '{platform_key}': "
+            f"{candidates}; set [tools.<name>.platforms] to choose explicitly"
+        )
+    return best_asset
+
+
+def _get_github_release(
+    spec: ToolSpec, tag: str, client: httpx.Client
+) -> dict[str, object]:
+    if spec.version == "latest":
+        url = f"https://api.github.com/repos/{spec.repo}/releases/latest"
+    else:
+        quoted_tag = quote(tag, safe="")
+        url = f"https://api.github.com/repos/{spec.repo}/releases/tags/{quoted_tag}"
+    resp = client.get(url, headers={"Accept": "application/vnd.github+json"})
+    resp.raise_for_status()
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise RuntimeError(f"{spec.bin}: invalid release metadata response")
+    return data
+
+
+def _score_asset_name(spec: ToolSpec, asset_name: str) -> int | None:
+    platform_key = detect_platform()
+    os_name, arch = platform_key.split("-", maxsplit=1)
+    normalized = asset_name.lower()
+    if any(token in normalized for token in _EXCLUDED_ASSET_TOKENS):
+        return None
+
+    os_tokens = _OS_TOKENS.get(os_name, (os_name,))
+    arch_tokens = _ARCH_TOKENS.get(arch, (arch,))
+    if not any(token in normalized for token in os_tokens):
+        return None
+    if not any(token in normalized for token in arch_tokens):
+        return None
+
+    score = 200
+    if spec.bin.lower() in normalized:
+        score += 20
+
+    if normalized.endswith((".tar.gz", ".tar.xz")):
+        score += 4
+    elif normalized.endswith(".zip"):
+        score += 3
+    elif normalized.endswith(".gz"):
+        score += 2
+    else:
+        score += 1
+
+    return score
+
+
+def _infer_extract_type(asset_name: str, opt_dir: str) -> str:
+    if asset_name.endswith((".tar.gz", ".tar.xz")):
+        return "tar" if opt_dir else "tar_binary"
+    if asset_name.endswith(".gz"):
+        return "gz_binary"
+    if asset_name.endswith(".zip"):
+        return "zip_binary"
+    return "raw_binary"
+
+
+def resolve_asset_url(spec: ToolSpec, tag: str, client: httpx.Client) -> str:
+    return resolve_github_release_asset(spec, tag, client).url
 
 
 def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
