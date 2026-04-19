@@ -1,5 +1,7 @@
 # ptm
 
+[![CI](https://github.com/halkn/ptm/actions/workflows/ci.yml/badge.svg)](https://github.com/halkn/ptm/actions/workflows/ci.yml)
+
 GitHub Releases や公式インストーラー経由で CLI ツールをインストール・管理するツールマネージャー。
 
 ## インストール
@@ -213,6 +215,8 @@ version_regex = 'Version ([\d.]+)'
 
 ## 開発
 
+GitHub Actions では `push` / `pull_request` 時に `ruff`、`ty`、`pytest` を実行します。
+
 ```bash
 # 依存関係のインストール
 uv sync
@@ -221,10 +225,10 @@ uv sync
 uv run pytest
 
 # Lint
-uv run ruff check src/
+uv run ruff check src tests
 
 # フォーマット
-uv run ruff format src/
+uv run ruff format src tests
 
 # 型チェック
 uv run ty check src tests
