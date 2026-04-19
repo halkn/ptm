@@ -57,7 +57,7 @@ def get_installed_version(spec: ToolSpec) -> str | None:
         )
         m = re.search(spec.version_regex, out)
         return m.group(1) if m else "unknown"
-    except (FileNotFoundError, subprocess.CalledProcessError):
+    except (FileNotFoundError, OSError, subprocess.CalledProcessError):
         return None
 
 

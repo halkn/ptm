@@ -80,6 +80,14 @@ class TestGetInstalledVersion:
         ):
             assert get_installed_version(spec) is None
 
+    def test_returns_none_on_exec_format_error(self):
+        spec = ToolSpec(bin="node")
+        with patch(
+            "subprocess.check_output",
+            side_effect=OSError(8, "Exec format error"),
+        ):
+            assert get_installed_version(spec) is None
+
     def test_returns_unknown_when_regex_does_not_match(self):
         spec = ToolSpec(bin="rg", version_regex=r"version: (\S+)")
         with patch("subprocess.check_output", return_value="no version here"):
