@@ -62,8 +62,6 @@ GitHub Releases の取得では `gh` コマンドを優先します。`gh auth l
 
 `~/.config/ptm/config.toml` に管理するツールを定義します。
 
-推奨する新しい構造は `[tools.<name>]` です。旧来の `[[github_release]]` などの形式も互換のため引き続き読み込めます。
-
 ツールは4種類の方法で管理できます。
 
 ---
