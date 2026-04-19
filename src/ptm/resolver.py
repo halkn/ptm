@@ -34,11 +34,26 @@ def version_status(installed: str | None, latest: str) -> str:
     return "[yellow]outdated[/yellow]"
 
 
+def get_npm_latest_version(spec: ToolSpec) -> str:
+    out = subprocess.check_output(
+        ["npm", "view", spec.package, "version"],
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    return out.strip().removeprefix("v")
+
+
 def get_comparable_latest_version(
     spec: ToolSpec, client: httpx.Client
 ) -> str | None:
-    if spec.type in {"installer", "npm"} or spec.version == "nightly":
+    if spec.version == "nightly":
         return None
+    if spec.type == "installer":
+        if not spec.version_url:
+            return None
+        return get_url_release_version(spec, client).removeprefix("v")
+    if spec.type == "npm":
+        return get_npm_latest_version(spec)
     if spec.type == "url_release":
         return get_url_release_version(spec, client).removeprefix("v")
     return get_latest_tag(spec, client).removeprefix("v")

@@ -180,15 +180,36 @@ class TestCmdCheck:
             cmd_check(tools, client)
         mock_latest.assert_not_called()
 
-    def test_npm_type_skips_version_fetch(self):
+    def test_installer_type_fetches_version_when_version_url_is_set(self):
+        tools = [
+            ToolSpec(
+                bin="uv",
+                type="installer",
+                command="install.sh",
+                version_url="https://example.com/uv.json",
+            )
+        ]
+        client = MagicMock()
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.5.0"),
+            patch(
+                "ptm.commands.get_comparable_latest_version", return_value="0.5.1"
+            ) as mock_latest,
+        ):
+            cmd_check(tools, client)
+        mock_latest.assert_called_once_with(tools[0], client)
+
+    def test_npm_type_fetches_version(self):
         tools = [ToolSpec(bin="markdownlint-cli2", type="npm")]
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="0.15.0"),
-            patch("ptm.commands.get_comparable_latest_version") as mock_latest,
+            patch(
+                "ptm.commands.get_comparable_latest_version", return_value="0.15.0"
+            ) as mock_latest,
         ):
             cmd_check(tools, client)
-        mock_latest.assert_not_called()
+        mock_latest.assert_called_once_with(tools[0], client)
 
     def test_nightly_skips_version_fetch(self):
         tools = [_make_spec(bin="nvim", version="nightly")]

@@ -10,6 +10,7 @@ from ptm.resolver import (
     get_comparable_latest_version,
     get_installed_version,
     get_latest_tag,
+    get_npm_latest_version,
     get_url_release_version,
     resolve_asset_url,
     resolve_url_release_url,
@@ -159,11 +160,34 @@ class TestGetUrlReleaseVersion:
             get_url_release_version(spec, client)
 
 
+class TestGetNpmLatestVersion:
+    def test_fetches_version_from_npm(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        with patch("subprocess.check_output", return_value="0.15.0\n") as mock_check:
+            assert get_npm_latest_version(spec) == "0.15.0"
+        mock_check.assert_called_once_with(
+            ["npm", "view", "markdownlint-cli2", "version"],
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+
+
 class TestGetComparableLatestVersion:
     def test_returns_none_for_installer(self):
         spec = ToolSpec(bin="uv", type="installer", command="install.sh")
         client = MagicMock()
         assert get_comparable_latest_version(spec, client) is None
+
+    def test_fetches_installer_version_when_version_url_is_set(self):
+        spec = ToolSpec(
+            bin="uv",
+            type="installer",
+            command="install.sh",
+            version_url="https://example.com/uv.json",
+        )
+        client = MagicMock()
+        with patch("ptm.resolver.get_url_release_version", return_value="0.9.1"):
+            assert get_comparable_latest_version(spec, client) == "0.9.1"
 
     def test_returns_none_for_nightly(self):
         spec = ToolSpec(bin="nvim", version="nightly")
@@ -181,6 +205,12 @@ class TestGetComparableLatestVersion:
         client = MagicMock()
         with patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"):
             assert get_comparable_latest_version(spec, client) == "22.0.0"
+
+    def test_fetches_npm_version(self):
+        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+        client = MagicMock()
+        with patch("ptm.resolver.get_npm_latest_version", return_value="0.15.0"):
+            assert get_comparable_latest_version(spec, client) == "0.15.0"
 
 
 class TestResolveAssetUrl:

@@ -90,7 +90,7 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
         installed = get_installed_version(spec)
         installed_str = installed or "[red]not installed[/red]"
 
-        if spec.type in {"installer", "npm"}:
+        if spec.type == "installer" and not spec.version_url:
             table.add_row(spec.bin, installed_str, "-", f"[dim]{spec.type}[/dim]")
             continue
 
