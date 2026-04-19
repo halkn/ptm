@@ -71,43 +71,6 @@ def test_load_tools_named_table_uses_key_as_default_bin(tmp_path: Path) -> None:
     assert tools[0].type == "installer"
 
 
-def test_load_tools_legacy_toml_is_still_supported(tmp_path: Path) -> None:
-    config = tmp_path / "tools.toml"
-    config.write_text(
-        textwrap.dedent("""\
-        [[github_release]]
-        bin = "rg"
-        repo = "BurntSushi/ripgrep"
-        """),
-        encoding="utf-8",
-    )
-
-    tools = load_tools(config)
-
-    assert len(tools) == 1
-    assert tools[0].bin == "rg"
-
-
-def test_load_tools_supports_mixed_named_and_legacy_formats(tmp_path: Path) -> None:
-    config = tmp_path / "tools.toml"
-    config.write_text(
-        textwrap.dedent("""\
-        [tools.uv]
-        type = "installer"
-        command = "echo install"
-
-        [[npm]]
-        bin = "markdownlint-cli2"
-        """),
-        encoding="utf-8",
-    )
-
-    tools = load_tools(config)
-
-    assert len(tools) == 2
-    assert {tool.bin for tool in tools} == {"uv", "markdownlint-cli2"}
-
-
 def test_load_tools_exits_when_file_not_found(tmp_path: Path) -> None:
     with pytest.raises(SystemExit):
         load_tools(tmp_path / "nonexistent.toml")
@@ -124,6 +87,20 @@ def test_load_tools_exits_for_unsupported_format(tmp_path: Path) -> None:
 def test_load_tools_exits_when_tools_is_not_table(tmp_path: Path) -> None:
     config = tmp_path / "tools.toml"
     config.write_text('tools = "invalid"', encoding="utf-8")
+
+    with pytest.raises(SystemExit):
+        load_tools(config)
+
+
+def test_load_tools_exits_when_tools_table_is_missing(tmp_path: Path) -> None:
+    config = tmp_path / "tools.toml"
+    config.write_text(
+        textwrap.dedent("""\
+        [github_release.rg]
+        repo = "BurntSushi/ripgrep"
+        """),
+        encoding="utf-8",
+    )
 
     with pytest.raises(SystemExit):
         load_tools(config)
