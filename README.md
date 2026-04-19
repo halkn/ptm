@@ -158,6 +158,8 @@ darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64
 bin = "uv"
 url = "https://astral.sh/uv/install.sh"
 update_command = "uv self update"
+version_url = "https://pypi.org/pypi/uv/json"
+version_url_regex = '"version":"([\d.]+)"'
 version_regex = 'uv ([\d.]+)'
 ```
 
@@ -167,8 +169,12 @@ version_regex = 'uv ([\d.]+)'
 | `url` | | インストールスクリプトの URL（`curl \| sh` で実行） |
 | `command` | | インストール時に実行するシェルコマンド |
 | `update_command` | | 更新時に実行するコマンド（省略時は `command` を使用） |
+| `version_url` | | `ptm check` / `ptm update` 用の最新版取得 URL |
+| `version_url_regex` | | `version_url` のレスポンスから最新版を抽出する正規表現 |
 
 `url` と `command` はいずれか一方を指定します。
+
+`version_url` を設定した `installer` は、`url_release` と同様に最新版比較の対象になります。`uv` のように公式インストーラーで導入しつつ、公開 API や JSON から最新バージョンを取得できるツール向けです。
 
 ---
 
@@ -194,6 +200,8 @@ version_regex = 'Version ([\d.]+)'
 | `package` | | npm パッケージ名（省略時は `bin` を使用） |
 | `version_cmd` | | バージョン確認コマンド（デフォルト: `[bin, "--version"]`） |
 | `version_regex` | | バージョン文字列を抽出する正規表現 |
+
+`ptm check` / `ptm update` では `npm view <package> version` を使って npm レジストリ上の最新版と比較します。
 
 ---
 
