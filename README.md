@@ -43,10 +43,10 @@ ptm check
 
 | オプション | 説明 |
 | --- | --- |
-| `--config PATH` | 設定ファイルのパスを指定（デフォルト: `~/.config/ptm/tools.toml`） |
+| `--config PATH` | 設定ファイルのパスを指定（デフォルト: `~/.config/ptm/config.toml`） |
 
 ```bash
-ptm --config ~/dotfiles/tools.toml install
+ptm --config ~/dotfiles/config.toml install
 ```
 
 ### 環境変数
@@ -60,24 +60,30 @@ GitHub Releases の取得では `gh` コマンドを優先します。`gh auth l
 
 ## 設定ファイル
 
-`~/.config/ptm/tools.toml` に管理するツールを定義します。
+`~/.config/ptm/config.toml` に管理するツールを定義します。
+
+推奨する新しい構造は `[tools.<name>]` です。旧来の `[[github_release]]` などの形式も互換のため引き続き読み込めます。
 
 ツールは4種類の方法で管理できます。
 
 ---
 
-### `[[github_release]]` — GitHub Releases からインストール
+### `[tools.<name>]` — ツール単位で定義
 
 ```toml
-[[github_release]]
-bin = "rg"
+[tools.rg]
+type = "github_release"
 repo = "BurntSushi/ripgrep"
 version_regex = 'ripgrep ([\d.]+)'
 
-[github_release.platforms]
+[tools.rg.platforms]
 linux-x86_64 = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz"
 darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 ```
+
+`<name>` は論理名です。`bin` を省略した場合は `<name>` が使われます。
+
+### `type = "github_release"` — GitHub Releases からインストール
 
 | フィールド | 必須 | 説明 |
 | --- | --- | --- |
@@ -102,28 +108,28 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 **アーカイブ全体を展開する場合（`opt_dir` 指定）:**
 
 ```toml
-[[github_release]]
-bin = "nvim"
+[tools.nvim]
+type = "github_release"
 repo = "neovim/neovim"
 version = "nightly"
 opt_dir = "~/.local/opt/neovim"
 bin_path_in_archive = "bin/nvim"
 version_regex = 'NVIM v([\d.]+-dev[^\s]*|[\d.]+)'
 
-[github_release.platforms]
+[tools.nvim.platforms]
 linux-x86_64 = "nvim-linux-x86_64.tar.gz"
 darwin-arm64 = "nvim-macos-arm64.tar.gz"
 ```
 
 ---
 
-### `[[url_release]]` — 任意の URL からインストール
+### `type = "url_release"` — 任意の URL からインストール
 
 GitHub 以外のホスティングサービス（Node.js 公式など）に使用します。
 
 ```toml
-[[url_release]]
-bin = "node"
+[tools.node]
+type = "url_release"
 version = "lts"
 version_url = "https://nodejs.org/dist/index.json"
 version_url_regex = '"version":"(v[\d.]+)"[^}]*"lts":"'
@@ -133,7 +139,7 @@ strip_components = 1
 extra_bins = ["npm", "npx", "corepack"]
 version_regex = 'v([\d.]+)'
 
-[url_release.platforms]
+[tools.node.platforms]
 linux-x86_64 = "https://nodejs.org/dist/v{version}/node-v{version}-linux-x64.tar.xz"
 darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64.tar.xz"
 ```
@@ -149,13 +155,13 @@ darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64
 
 ---
 
-### `[[installer]]` — カスタムインストーラー
+### `type = "installer"` — カスタムインストーラー
 
 公式インストールスクリプトを使う場合などに使用します。
 
 ```toml
-[[installer]]
-bin = "uv"
+[tools.uv]
+type = "installer"
 url = "https://astral.sh/uv/install.sh"
 update_command = "uv self update"
 version_url = "https://pypi.org/pypi/uv/json"
@@ -178,17 +184,17 @@ version_regex = 'uv ([\d.]+)'
 
 ---
 
-### `[[npm]]` — npm グローバルパッケージ
+### `type = "npm"` — npm グローバルパッケージ
 
 `npm install -g` / `npm update -g` で管理したいツールに使用します。
 
 ```toml
-[[npm]]
-bin = "markdownlint-cli2"
+[tools.markdownlint-cli2]
+type = "npm"
 version_regex = 'markdownlint-cli2 v([\d.]+)'
 
-[[npm]]
-bin = "tsc"
+[tools.tsc]
+type = "npm"
 package = "typescript"
 version_cmd = ["tsc", "--version"]
 version_regex = 'Version ([\d.]+)'
