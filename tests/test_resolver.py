@@ -369,3 +369,44 @@ class TestResolveUrlReleaseUrl:
         with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
             url = resolve_url_release_url(spec, "v22.0.0")
         assert url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
+
+    def test_auto_resolves_node_dist_url_when_platforms_are_omitted(self):
+        spec = ToolSpec(
+            bin="node",
+            type="url_release",
+            version_url="https://nodejs.org/dist/index.json",
+        )
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            url = resolve_url_release_url(spec, "v22.0.0")
+        assert url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
+
+    def test_auto_resolves_node_dist_url_for_darwin_arm64(self):
+        spec = ToolSpec(
+            bin="node",
+            type="url_release",
+            version_url="https://nodejs.org/dist/index.json",
+        )
+        with patch("ptm.resolver.detect_platform", return_value="darwin-arm64"):
+            url = resolve_url_release_url(spec, "v22.0.0")
+        assert url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-darwin-arm64.tar.xz"
+
+    def test_raises_for_unknown_url_release_without_platforms(self):
+        spec = ToolSpec(
+            bin="custom-tool",
+            type="url_release",
+            version_url="https://example.com/releases.json",
+        )
+        with pytest.raises(RuntimeError, match="no URL template for platform"):
+            resolve_url_release_url(spec, "1.2.3")
+
+    def test_raises_for_unsupported_node_platform(self):
+        spec = ToolSpec(
+            bin="node",
+            type="url_release",
+            version_url="https://nodejs.org/dist/index.json",
+        )
+        with (
+            patch("ptm.resolver.detect_platform", return_value="windows-x86_64"),
+            pytest.raises(RuntimeError, match=r"no Node\.js dist asset for platform"),
+        ):
+            resolve_url_release_url(spec, "v22.0.0")

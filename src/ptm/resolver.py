@@ -24,6 +24,12 @@ _ARCH_TOKENS: dict[str, tuple[str, ...]] = {
     "x86_64": ("x86_64", "amd64", "x64"),
     "arm64": ("arm64", "aarch64"),
 }
+_NODE_DIST_PLATFORM_ALIASES: dict[str, str] = {
+    "linux-x86_64": "linux-x64",
+    "linux-arm64": "linux-arm64",
+    "darwin-x86_64": "darwin-x64",
+    "darwin-arm64": "darwin-arm64",
+}
 _EXCLUDED_ASSET_TOKENS = (
     "checksums",
     "checksum",
@@ -266,6 +272,37 @@ def resolve_asset_url(spec: ToolSpec, tag: str, client: httpx.Client) -> str:
 
 
 def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
+    if not spec.platforms:
+        return _resolve_known_url_release_url(spec, version)
     template = _get_platform_template(spec)
     v = version.removeprefix("v")
     return template.replace("{version}", v).replace("{tag}", version)
+
+
+def _resolve_known_url_release_url(spec: ToolSpec, version: str) -> str:
+    if _uses_node_dist_index(spec):
+        return _resolve_node_dist_url(version)
+    raise RuntimeError(
+        f"{spec.bin}: no URL template for platform '{detect_platform()}'; "
+        "set [tools.<name>.platforms] to configure explicit download URLs"
+    )
+
+
+def _uses_node_dist_index(spec: ToolSpec) -> bool:
+    return (
+        spec.bin == "node" and spec.version_url == "https://nodejs.org/dist/index.json"
+    )
+
+
+def _resolve_node_dist_url(version: str) -> str:
+    platform_key = detect_platform()
+    platform_alias = _NODE_DIST_PLATFORM_ALIASES.get(platform_key)
+    if platform_alias is None:
+        raise RuntimeError(
+            f"node: no Node.js dist asset for platform '{platform_key}'; "
+            "set [tools.<name>.platforms] to configure explicit download URLs"
+        )
+    normalized_version = version.removeprefix("v")
+    version_tag = f"v{normalized_version}"
+    filename = f"node-{version_tag}-{platform_alias}.tar.xz"
+    return f"https://nodejs.org/dist/{version_tag}/{filename}"

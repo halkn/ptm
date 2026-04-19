@@ -151,6 +151,8 @@ darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64
 
 `platforms` の値はアセットファイル名ではなく **完全な URL** を指定します。
 
+`platforms` を省略する場合、現状は Node.js の `https://nodejs.org/dist/index.json` を使う `node` 設定のみ自動解決に対応しています。それ以外の `url_release` は明示 `platforms` が必要です。
+
 ---
 
 ### `type = "installer"` — カスタムインストーラー
