@@ -14,14 +14,8 @@ import httpx
 
 from ptm.config import BIN_DIR
 from ptm.console import console
-from ptm.models import ToolSpec
-from ptm.resolver import (
-    get_installed_version,
-    get_latest_tag,
-    get_url_release_version,
-    resolve_github_release_asset,
-    resolve_url_release_asset,
-)
+from ptm.models import InstallPlan, ToolSpec
+from ptm.resolver import get_installed_version, resolve_install_plan
 
 
 def _make_executable(path: Path) -> None:
@@ -169,16 +163,10 @@ def _dispatch_extract(
             raise ValueError(f"Unknown extract type: {resolved_extract}")
 
 
-def _install_github_release(spec: ToolSpec, client: httpx.Client) -> None:
-    tag = get_latest_tag(spec, client)
-    asset = resolve_github_release_asset(spec, tag, client)
-    _dispatch_extract(spec, asset.url, client, extract=asset.extract)
-
-
-def _install_url_release(spec: ToolSpec, client: httpx.Client) -> None:
-    version = get_url_release_version(spec, client)
-    asset = resolve_url_release_asset(spec, version)
-    _dispatch_extract(spec, asset.url, client, extract=asset.extract)
+def _install_release_plan(plan: InstallPlan, client: httpx.Client) -> None:
+    if plan.url is None:
+        raise ValueError(f"{plan.spec.bin}: install URL is not resolved")
+    _dispatch_extract(plan.spec, plan.url, client, extract=plan.extract)
 
 
 def _run_installer(spec: ToolSpec, update: bool = False) -> None:
@@ -202,16 +190,20 @@ def _run_npm_install(spec: ToolSpec, update: bool = False) -> None:
     subprocess.run(cmd, check=True)
 
 
-def do_install(spec: ToolSpec, client: httpx.Client, update: bool = False) -> bool:
+def do_install(
+    spec: ToolSpec,
+    client: httpx.Client,
+    update: bool = False,
+    plan: InstallPlan | None = None,
+) -> bool:
     """Install or update a tool. Returns True on success, False on failure."""
     label = "Updating" if update else "Installing"
     console.print(f"[bold cyan]{label} {spec.bin}[/bold cyan]")
     try:
         match spec.type:
-            case "github_release":
-                _install_github_release(spec, client)
-            case "url_release":
-                _install_url_release(spec, client)
+            case "github_release" | "url_release":
+                resolved_plan = plan or resolve_install_plan(spec, client)
+                _install_release_plan(resolved_plan, client)
             case "installer":
                 _run_installer(spec, update=update)
             case "npm":

@@ -9,12 +9,15 @@ from ptm.resolver import (
     _score_asset_name,
     detect_platform,
     get_comparable_latest_version,
+    get_comparable_version,
     get_installed_version,
     get_latest_tag,
     get_npm_latest_version,
     get_url_release_version,
     resolve_asset_url,
     resolve_github_release_asset,
+    resolve_install_plan,
+    resolve_latest_version,
     resolve_url_release_asset,
     resolve_url_release_url,
     version_status,
@@ -224,6 +227,86 @@ class TestGetComparableLatestVersion:
         client = MagicMock()
         with patch("ptm.resolver.get_npm_latest_version", return_value="0.15.0"):
             assert get_comparable_latest_version(spec, client) == "0.15.0"
+
+
+class TestResolveLatestVersion:
+    def test_installer_without_version_url_returns_none(self):
+        spec = ToolSpec(bin="uv", type="installer", command="install.sh")
+        client = MagicMock()
+        assert resolve_latest_version(spec, client) is None
+
+    def test_github_release_resolves_latest_tag(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", version="latest")
+        client = MagicMock()
+        with patch("ptm.resolver.get_latest_tag", return_value="v14.1.0"):
+            assert resolve_latest_version(spec, client) == "v14.1.0"
+
+
+class TestGetComparableVersion:
+    def test_returns_none_for_nightly(self):
+        spec = ToolSpec(bin="nvim", version="nightly")
+        assert get_comparable_version(spec, "nightly") is None
+
+    def test_strips_v_prefix(self):
+        spec = ToolSpec(bin="rg", type="github_release")
+        assert get_comparable_version(spec, "v14.1.0") == "14.1.0"
+
+
+class TestResolveInstallPlan:
+    def test_resolves_github_release_plan(self):
+        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", type="github_release")
+        client = MagicMock()
+        with (
+            patch("ptm.resolver._get_github_release") as mock_release,
+            patch(
+                "ptm.resolver._resolve_github_release_asset_from_release"
+            ) as mock_asset,
+        ):
+            mock_release.return_value = {"tag_name": "v14.1.0", "assets": []}
+            mock_asset.return_value.url = "https://example.com/rg.tar.gz"
+            mock_asset.return_value.extract = "tar_binary"
+            plan = resolve_install_plan(spec, client)
+        assert plan.spec == spec
+        assert plan.version == "v14.1.0"
+        assert plan.url == "https://example.com/rg.tar.gz"
+        assert plan.extract == "tar_binary"
+
+    def test_resolves_github_release_plan_with_platform_template(self):
+        spec = ToolSpec(
+            bin="rg",
+            repo="BurntSushi/ripgrep",
+            type="github_release",
+            platforms={"linux-x86_64": "ripgrep-{version}-x86_64.tar.gz"},
+        )
+        client = MagicMock()
+        with (
+            patch("ptm.resolver.get_latest_tag", return_value="v14.1.0") as mock_tag,
+            patch("ptm.resolver.resolve_github_release_asset") as mock_asset,
+            patch("ptm.resolver._get_github_release") as mock_release,
+        ):
+            mock_asset.return_value.url = "https://example.com/rg.tar.gz"
+            mock_asset.return_value.extract = "tar_binary"
+            plan = resolve_install_plan(spec, client)
+        mock_tag.assert_called_once_with(spec, client)
+        mock_asset.assert_called_once_with(spec, "v14.1.0", client)
+        mock_release.assert_not_called()
+        assert plan.version == "v14.1.0"
+        assert plan.url == "https://example.com/rg.tar.gz"
+        assert plan.extract == "tar_binary"
+
+    def test_resolves_url_release_plan(self):
+        spec = ToolSpec(bin="node", type="url_release", version_url="https://example.com")
+        client = MagicMock()
+        with (
+            patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"),
+            patch("ptm.resolver.resolve_url_release_asset") as mock_asset,
+        ):
+            mock_asset.return_value.url = "https://example.com/node.tar.xz"
+            mock_asset.return_value.extract = "tar_binary"
+            plan = resolve_install_plan(spec, client)
+        assert plan.version == "v22.0.0"
+        assert plan.url == "https://example.com/node.tar.xz"
+        assert plan.extract == "tar_binary"
 
 
 class TestResolveAssetUrl:

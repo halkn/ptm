@@ -6,7 +6,7 @@ from urllib.parse import quote
 
 import httpx
 
-from ptm.models import ToolSpec
+from ptm.models import InstallPlan, ToolSpec
 
 
 @dataclass(frozen=True)
@@ -78,18 +78,59 @@ def get_npm_latest_version(spec: ToolSpec) -> str:
     return out.strip().removeprefix("v")
 
 
-def get_comparable_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
-    if spec.version == "nightly":
-        return None
+def resolve_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
     if spec.type == "installer":
         if not spec.version_url:
             return None
-        return get_url_release_version(spec, client).removeprefix("v")
+        return get_url_release_version(spec, client)
     if spec.type == "npm":
         return get_npm_latest_version(spec)
     if spec.type == "url_release":
-        return get_url_release_version(spec, client).removeprefix("v")
-    return get_latest_tag(spec, client).removeprefix("v")
+        return get_url_release_version(spec, client)
+    return get_latest_tag(spec, client)
+
+
+def get_comparable_version(spec: ToolSpec, version: str | None) -> str | None:
+    if version is None or spec.version == "nightly":
+        return None
+    if spec.type in {"github_release", "url_release", "installer", "npm"}:
+        return version.removeprefix("v")
+    return version
+
+
+def get_comparable_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
+    return get_comparable_version(spec, resolve_latest_version(spec, client))
+
+
+def resolve_install_plan(spec: ToolSpec, client: httpx.Client) -> InstallPlan:
+    match spec.type:
+        case "github_release":
+            if spec.platforms:
+                version = get_latest_tag(spec, client)
+                asset = resolve_github_release_asset(spec, version, client)
+            else:
+                release = _get_github_release(spec, client)
+                version = _get_release_tag(spec, release)
+                asset = _resolve_github_release_asset_from_release(spec, release)
+            return InstallPlan(
+                spec=spec,
+                version=version,
+                url=asset.url,
+                extract=asset.extract,
+            )
+        case "url_release":
+            version = get_url_release_version(spec, client)
+            asset = resolve_url_release_asset(spec, version)
+            return InstallPlan(
+                spec=spec,
+                version=version,
+                url=asset.url,
+                extract=asset.extract,
+            )
+        case "installer" | "npm":
+            return InstallPlan(spec=spec, version=resolve_latest_version(spec, client))
+        case _:
+            raise ValueError(f"Unknown type: {spec.type}")
 
 
 def _get_latest_tag_via_gh(spec: ToolSpec) -> str | None:
@@ -123,6 +164,15 @@ def get_latest_tag(spec: ToolSpec, client: httpx.Client) -> str:
     resp = client.get(url, headers={"Accept": "application/vnd.github+json"})
     resp.raise_for_status()
     return resp.json()["tag_name"]
+
+
+def _get_release_tag(spec: ToolSpec, release: dict[str, object]) -> str:
+    if spec.version != "latest":
+        return spec.version
+    tag = release.get("tag_name")
+    if not isinstance(tag, str) or not tag:
+        raise RuntimeError(f"{spec.bin}: invalid release metadata response")
+    return tag
 
 
 def get_url_release_version(spec: ToolSpec, client: httpx.Client) -> str:
@@ -163,7 +213,13 @@ def resolve_github_release_asset(
 def _resolve_github_release_asset_automatically(
     spec: ToolSpec, tag: str, client: httpx.Client
 ) -> ResolvedAsset:
-    release = _get_github_release(spec, tag, client)
+    release = _get_github_release(spec, client, tag)
+    return _resolve_github_release_asset_from_release(spec, release)
+
+
+def _resolve_github_release_asset_from_release(
+    spec: ToolSpec, release: dict[str, object]
+) -> ResolvedAsset:
     raw_assets = release.get("assets", [])
     if not isinstance(raw_assets, list):
         raise RuntimeError(f"{spec.bin}: invalid release assets payload")
@@ -212,12 +268,13 @@ def _resolve_github_release_asset_automatically(
 
 
 def _get_github_release(
-    spec: ToolSpec, tag: str, client: httpx.Client
+    spec: ToolSpec, client: httpx.Client, tag: str | None = None
 ) -> dict[str, object]:
-    if spec.version == "latest":
+    release_ref = tag or spec.version
+    if release_ref == "latest":
         url = f"https://api.github.com/repos/{spec.repo}/releases/latest"
     else:
-        quoted_tag = quote(tag, safe="")
+        quoted_tag = quote(release_ref, safe="")
         url = f"https://api.github.com/repos/{spec.repo}/releases/tags/{quoted_tag}"
     resp = client.get(url, headers={"Accept": "application/vnd.github+json"})
     resp.raise_for_status()
