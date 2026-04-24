@@ -7,8 +7,9 @@ from ptm.console import console
 from ptm.installer import do_install
 from ptm.models import ToolSpec
 from ptm.resolver import (
-    get_comparable_latest_version,
+    get_comparable_version,
     get_installed_version,
+    resolve_install_plan,
     version_status,
 )
 
@@ -42,12 +43,19 @@ def cmd_update(tools: list[ToolSpec], target: str | None, client: httpx.Client) 
     failed = False
     for spec in _filter_tools(tools, target):
         installed = get_installed_version(spec)
-        if _is_up_to_date(spec, installed, client):
+        plan = resolve_install_plan(spec, client)
+        latest = get_comparable_version(spec, plan.version)
+        if (
+            installed is not None
+            and latest is not None
+            and version_status(installed, latest) == "[green]up-to-date[/green]"
+        ):
             console.print(
-                f"[dim]  {spec.bin}: already up-to-date ({installed}), skipping[/dim]"
+                f"[dim]  {spec.bin}: already up-to-date "
+                f"({installed}), skipping[/dim]"
             )
             continue
-        if not do_install(spec, client, update=True):
+        if not do_install(spec, client, update=True, plan=plan):
             failed = True
     if failed:
         sys.exit(1)
@@ -56,7 +64,8 @@ def cmd_update(tools: list[ToolSpec], target: str | None, client: httpx.Client) 
 def _is_up_to_date(spec: ToolSpec, installed: str | None, client: httpx.Client) -> bool:
     if installed is None:
         return False
-    latest = get_comparable_latest_version(spec, client)
+    plan = resolve_install_plan(spec, client)
+    latest = get_comparable_version(spec, plan.version)
     if latest is None:
         return False
     return version_status(installed, latest) == "[green]up-to-date[/green]"
@@ -99,7 +108,8 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
             continue
 
         try:
-            latest = get_comparable_latest_version(spec, client)
+            plan = resolve_install_plan(spec, client)
+            latest = get_comparable_version(spec, plan.version)
         except Exception as e:
             table.add_row(spec.bin, installed_str, f"[red]error: {e}[/red]", "")
             continue

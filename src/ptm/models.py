@@ -54,3 +54,11 @@ class ToolSpec:
     def from_dict(cls, d: dict) -> "ToolSpec":
         known = {f for f in cls.__dataclass_fields__}
         return cls(**{k: v for k, v in d.items() if k in known})
+
+
+@dataclass(frozen=True)
+class InstallPlan:
+    spec: ToolSpec
+    version: str | None = None
+    url: str | None = None
+    extract: str | None = None

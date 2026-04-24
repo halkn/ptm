@@ -14,6 +14,7 @@ from ptm.installer import (
     _extract_binary_from_tar,
     _install_gz_binary,
     _install_raw_binary,
+    _install_release_plan,
     _install_tar,
     _install_tar_binary,
     _install_zip_binary,
@@ -22,7 +23,7 @@ from ptm.installer import (
     _strip_components,
     do_install,
 )
-from ptm.models import ToolSpec
+from ptm.models import InstallPlan, ToolSpec
 
 # ---- helpers ----------------------------------------------------------------
 
@@ -387,22 +388,56 @@ class TestDoInstall:
     def test_installs_github_release(self):
         spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
         client = MagicMock()
+        plan = InstallPlan(
+            spec=spec,
+            version="v14.1.0",
+            url="https://example.com/rg.tar.gz",
+            extract="tar_binary",
+        )
         with (
-            patch("ptm.installer._install_github_release") as mock_install,
+            patch("ptm.installer.resolve_install_plan", return_value=plan) as mock_plan,
+            patch("ptm.installer._install_release_plan") as mock_install,
             patch("ptm.installer.get_installed_version", return_value="14.1.0"),
         ):
             do_install(spec, client)
-        mock_install.assert_called_once_with(spec, client)
+        mock_plan.assert_called_once_with(spec, client)
+        mock_install.assert_called_once_with(plan, client)
 
     def test_installs_url_release(self):
         spec = ToolSpec(bin="node", type="url_release")
         client = MagicMock()
+        plan = InstallPlan(
+            spec=spec,
+            version="v22.0.0",
+            url="https://example.com/node.tar.xz",
+            extract="tar_binary",
+        )
         with (
-            patch("ptm.installer._install_url_release") as mock_install,
+            patch("ptm.installer.resolve_install_plan", return_value=plan) as mock_plan,
+            patch("ptm.installer._install_release_plan") as mock_install,
             patch("ptm.installer.get_installed_version", return_value="22.0.0"),
         ):
             do_install(spec, client)
-        mock_install.assert_called_once_with(spec, client)
+        mock_plan.assert_called_once_with(spec, client)
+        mock_install.assert_called_once_with(plan, client)
+
+    def test_uses_provided_release_plan(self):
+        spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
+        client = MagicMock()
+        plan = InstallPlan(
+            spec=spec,
+            version="v14.1.0",
+            url="https://example.com/rg.tar.gz",
+            extract="tar_binary",
+        )
+        with (
+            patch("ptm.installer.resolve_install_plan") as mock_plan,
+            patch("ptm.installer._install_release_plan") as mock_install,
+            patch("ptm.installer.get_installed_version", return_value="14.1.0"),
+        ):
+            do_install(spec, client, plan=plan)
+        mock_plan.assert_not_called()
+        mock_install.assert_called_once_with(plan, client)
 
     def test_runs_installer(self):
         spec = ToolSpec(bin="uv", type="installer", command="install.sh")
@@ -437,8 +472,31 @@ class TestDoInstall:
     def test_prints_error_on_failure(self, capsys: pytest.CaptureFixture):
         spec = ToolSpec(bin="rg", type="github_release")
         client = MagicMock()
-        with patch(
-            "ptm.installer._install_github_release",
-            side_effect=RuntimeError("network error"),
+        with (
+            patch(
+                "ptm.installer.resolve_install_plan",
+                return_value=InstallPlan(spec=spec, url="https://example.com/rg"),
+            ),
+            patch(
+                "ptm.installer._install_release_plan",
+                side_effect=RuntimeError("network error"),
+            ),
         ):
             do_install(spec, client)  # 例外が外に漏れないこと
+
+
+class TestInstallReleasePlan:
+    def test_dispatches_extract_from_plan(self):
+        spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
+        plan = InstallPlan(
+            spec=spec,
+            version="v14.1.0",
+            url="https://example.com/rg.tar.gz",
+            extract="tar_binary",
+        )
+        client = MagicMock()
+        with patch("ptm.installer._dispatch_extract") as mock_dispatch:
+            _install_release_plan(plan, client)
+        mock_dispatch.assert_called_once_with(
+            spec, "https://example.com/rg.tar.gz", client, extract="tar_binary"
+        )
