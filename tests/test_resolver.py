@@ -295,7 +295,9 @@ class TestResolveInstallPlan:
         assert plan.extract == "tar_binary"
 
     def test_resolves_url_release_plan(self):
-        spec = ToolSpec(bin="node", type="url_release", version_url="https://example.com")
+        spec = ToolSpec(
+            bin="node", type="url_release", version_url="https://example.com"
+        )
         client = MagicMock()
         with (
             patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"),

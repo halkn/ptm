@@ -24,6 +24,9 @@ jobs:
       - name: Run Ruff
         run: uv run ruff check src tests
 
+      - name: Check formatting
+        run: uv run ruff format --check src tests
+
       - name: Run type checks
         run: uv run ty check src tests
 
