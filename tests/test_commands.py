@@ -1,3 +1,4 @@
+import threading
 from typing import NotRequired, TypedDict, Unpack
 from unittest.mock import MagicMock, patch
 
@@ -158,6 +159,58 @@ class TestCmdUpdate:
             cmd_update(tools, None, client)
         mock_do.assert_called_once_with(tools[0], client, update=True, plan=plan)
 
+    def test_resolves_update_checks_concurrently(self):
+        tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
+        client = MagicMock()
+        barrier = threading.Barrier(2, timeout=1)
+
+        def resolve_plan(spec: ToolSpec, _client: MagicMock) -> InstallPlan:
+            barrier.wait()
+            return InstallPlan(spec, version="v1.0.0")
+
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
+            patch("ptm.commands.do_install", return_value=True),
+        ):
+            cmd_update(tools, None, client)
+
+    def test_installs_updates_in_config_order_after_parallel_checks(self):
+        tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
+        client = MagicMock()
+
+        def resolve_plan(spec: ToolSpec, _client: MagicMock) -> InstallPlan:
+            return InstallPlan(spec, version=f"v1.0.0-{spec.bin}")
+
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
+            patch("ptm.commands.do_install", return_value=True) as mock_do,
+        ):
+            cmd_update(tools, None, client)
+
+        assert [call.args[0].bin for call in mock_do.call_args_list] == ["rg", "fd"]
+
+    def test_skips_update_when_version_check_fails_and_exits_after_other_tools(self):
+        tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
+        client = MagicMock()
+
+        def resolve_plan(spec: ToolSpec, _client: MagicMock) -> InstallPlan:
+            if spec.bin == "rg":
+                raise RuntimeError("API error")
+            return InstallPlan(spec, version="v1.0.0")
+
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
+            patch("ptm.commands.do_install", return_value=True) as mock_do,
+            pytest.raises(SystemExit),
+        ):
+            cmd_update(tools, None, client)
+
+        mock_do.assert_called_once()
+        assert mock_do.call_args.args[0].bin == "fd"
+
 
 # ---- cmd_list ---------------------------------------------------------------
 
@@ -268,3 +321,35 @@ class TestCmdCheck:
             ),
         ):
             cmd_check(tools, client)  # 例外が外に漏れないこと
+
+    def test_resolves_version_checks_concurrently(self):
+        tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
+        client = MagicMock()
+        barrier = threading.Barrier(2, timeout=1)
+
+        def resolve_plan(spec: ToolSpec, _client: MagicMock) -> InstallPlan:
+            barrier.wait()
+            return InstallPlan(spec, version="v1.0.0")
+
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
+        ):
+            cmd_check(tools, client)
+
+    def test_preserves_check_output_order_after_parallel_checks(self):
+        tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
+        client = MagicMock()
+
+        def resolve_plan(spec: ToolSpec, _client: MagicMock) -> InstallPlan:
+            return InstallPlan(spec, version=f"v1.0.0-{spec.bin}")
+
+        with (
+            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
+            patch("ptm.commands.console.print") as mock_print,
+        ):
+            cmd_check(tools, client)
+
+        table = mock_print.call_args.args[0]
+        assert table.columns[0]._cells == ["rg", "fd"]
