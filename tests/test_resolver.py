@@ -435,6 +435,90 @@ class TestResolveGithubReleaseAssetAutomatically:
         ):
             resolve_github_release_asset(spec, "1.0.0", client)
 
+    def test_prefers_musl_over_gnu_for_linux_assets(self):
+        spec = ToolSpec(bin="fd", repo="sharkdp/fd", type="github_release")
+        client = MagicMock()
+        client.get.return_value.json.return_value = {
+            "assets": [
+                {
+                    "name": "fd-v10.4.2-x86_64-unknown-linux-gnu.tar.gz",
+                    "browser_download_url": "https://example.com/fd-gnu.tar.gz",
+                },
+                {
+                    "name": "fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz",
+                    "browser_download_url": "https://example.com/fd-musl.tar.gz",
+                },
+            ]
+        }
+
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            asset = resolve_github_release_asset(spec, "v10.4.2", client)
+
+        assert asset.name == "fd-v10.4.2-x86_64-unknown-linux-musl.tar.gz"
+
+    def test_prefers_tar_xz_over_tar_gz(self):
+        spec = ToolSpec(bin="shellcheck", repo="koalaman/shellcheck")
+        client = MagicMock()
+        client.get.return_value.json.return_value = {
+            "assets": [
+                {
+                    "name": "shellcheck-v0.11.0.linux.x86_64.tar.gz",
+                    "browser_download_url": "https://example.com/shellcheck.tar.gz",
+                },
+                {
+                    "name": "shellcheck-v0.11.0.linux.x86_64.tar.xz",
+                    "browser_download_url": "https://example.com/shellcheck.tar.xz",
+                },
+            ]
+        }
+
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            asset = resolve_github_release_asset(spec, "v0.11.0", client)
+
+        assert asset.name == "shellcheck-v0.11.0.linux.x86_64.tar.xz"
+
+    def test_accepts_archless_asset_when_no_arch_specific_asset_exists(self):
+        spec = ToolSpec(bin="selene", repo="Kampfkarren/selene")
+        client = MagicMock()
+        client.get.return_value.json.return_value = {
+            "assets": [
+                {
+                    "name": "selene-0.30.1-macos.zip",
+                    "browser_download_url": "https://example.com/selene-macos.zip",
+                },
+                {
+                    "name": "selene-0.30.1-linux.zip",
+                    "browser_download_url": "https://example.com/selene-linux.zip",
+                },
+            ]
+        }
+
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            asset = resolve_github_release_asset(spec, "0.30.1", client)
+
+        assert asset.name == "selene-0.30.1-linux.zip"
+
+    def test_prefers_normal_asset_over_light_variant(self):
+        spec = ToolSpec(bin="selene", repo="Kampfkarren/selene")
+        client = MagicMock()
+        client.get.return_value.json.return_value = {
+            "assets": [
+                {
+                    "name": "selene-light-0.30.1-linux.zip",
+                    "browser_download_url": "https://example.com/selene-light-linux.zip",
+                },
+                {
+                    "name": "selene-0.30.1-linux.zip",
+                    "browser_download_url": "https://example.com/selene-linux.zip",
+                },
+            ]
+        }
+
+        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
+            asset = resolve_github_release_asset(spec, "0.30.1", client)
+
+        assert asset.name == "selene-0.30.1-linux.zip"
+
 
 class TestScoreAssetName:
     def test_ignores_checksum_assets(self):
