@@ -6,6 +6,7 @@ import pytest
 
 from ptm.commands import cmd_check, cmd_install, cmd_list, cmd_update
 from ptm.models import InstallPlan, ToolSpec
+from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 
 
 class ToolSpecOverrides(TypedDict):
@@ -273,8 +274,9 @@ class TestCmdCheck:
             cmd_check(tools, client)
         mock_plan.assert_called_once_with(tools[0], client)
 
-    def test_npm_type_fetches_version(self):
-        tools = [ToolSpec(bin="markdownlint-cli2", type="npm")]
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_package_manager_type_fetches_version(self, tool_type: str):
+        tools = [ToolSpec(bin="markdownlint-cli2", type=tool_type)]
         client = MagicMock()
         with (
             patch("ptm.commands.get_installed_version", return_value="0.15.0"),

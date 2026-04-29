@@ -44,13 +44,16 @@ def test_load_tools_named_table_all_types(tmp_path: Path) -> None:
 
         [tools.markdownlint-cli2]
         type = "npm"
+
+        [tools.prettier]
+        type = "bun"
         """),
         encoding="utf-8",
     )
     tools = load_tools(config)
-    assert len(tools) == 4
+    assert len(tools) == 5
     types = {t.type for t in tools}
-    assert types == {"github_release", "url_release", "installer", "npm"}
+    assert types == {"github_release", "url_release", "installer", "npm", "bun"}
 
 
 def test_load_tools_named_table_uses_key_as_default_bin(tmp_path: Path) -> None:

@@ -186,9 +186,9 @@ version_regex = 'uv ([\d.]+)'
 
 ---
 
-### `type = "npm"` — npm グローバルパッケージ
+### `type = "npm"` / `type = "bun"` — npm / Bun グローバルパッケージ
 
-`npm install -g` / `npm update -g` で管理したいツールに使用します。
+npm または Bun のグローバルパッケージとして管理したいツールに使用します。
 
 ```toml
 [tools.markdownlint-cli2]
@@ -200,16 +200,21 @@ type = "npm"
 package = "typescript"
 version_cmd = ["tsc", "--version"]
 version_regex = 'Version ([\d.]+)'
+
+[tools.prettier]
+type = "bun"
 ```
 
 | フィールド | 必須 | 説明 |
 | --- | --- | --- |
 | `bin` | ✓ | バイナリ名 |
-| `package` | | npm パッケージ名（省略時は `bin` を使用） |
+| `package` | | npm / Bun パッケージ名（省略時は `bin` を使用） |
 | `version_cmd` | | バージョン確認コマンド（デフォルト: `[bin, "--version"]`） |
 | `version_regex` | | バージョン文字列を抽出する正規表現 |
 
-`ptm check` / `ptm update` では `npm view <package> version` を使って npm レジストリ上の最新版と比較します。
+`type = "npm"` では `npm install -g <package>` / `npm update -g <package>` を実行します。
+`type = "bun"` では `bun install -g <package>` / `bun update -g <package>` を実行します。
+どちらも npm registry の metadata API を使って最新版と比較します。
 
 ---
 

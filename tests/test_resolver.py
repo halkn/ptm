@@ -4,15 +4,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from ptm.models import ToolSpec
+from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 from ptm.resolver import (
     _get_latest_tag_via_gh,
+    _get_package_registry_latest_version,
     _score_asset_name,
     detect_platform,
     get_comparable_latest_version,
     get_comparable_version,
     get_installed_version,
     get_latest_tag,
-    get_npm_latest_version,
     get_url_release_version,
     resolve_asset_url,
     resolve_github_release_asset,
@@ -174,16 +175,42 @@ class TestGetUrlReleaseVersion:
             get_url_release_version(spec, client)
 
 
-class TestGetNpmLatestVersion:
-    def test_fetches_version_from_npm(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
-        with patch("subprocess.check_output", return_value="0.15.0\n") as mock_check:
-            assert get_npm_latest_version(spec) == "0.15.0"
-        mock_check.assert_called_once_with(
-            ["npm", "view", "markdownlint-cli2", "version"],
-            stderr=subprocess.STDOUT,
-            text=True,
+class TestGetNpmRegistryLatestVersion:
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_fetches_version(self, tool_type: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=tool_type)
+        client = MagicMock()
+        client.get.return_value.json.return_value = {"dist-tags": {"latest": "0.15.0"}}
+
+        assert _get_package_registry_latest_version(spec, client) == "0.15.0"
+
+        client.get.assert_called_once_with(
+            "https://registry.npmjs.org/markdownlint-cli2",
+            headers={"Accept": "application/vnd.npm.install-v1+json"},
         )
+        client.get.return_value.raise_for_status.assert_called_once()
+
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_fetches_scoped_package_version(self, tool_type: str):
+        spec = ToolSpec(bin="eslint", type=tool_type, package="@eslint/js")
+        client = MagicMock()
+        client.get.return_value.json.return_value = {"dist-tags": {"latest": "9.39.1"}}
+
+        assert _get_package_registry_latest_version(spec, client) == "9.39.1"
+
+        client.get.assert_called_once_with(
+            "https://registry.npmjs.org/@eslint%2Fjs",
+            headers={"Accept": "application/vnd.npm.install-v1+json"},
+        )
+
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_raises_when_latest_version_is_missing(self, tool_type: str):
+        spec = ToolSpec(bin="tool", type=tool_type)
+        client = MagicMock()
+        client.get.return_value.json.return_value = {"dist-tags": {}}
+
+        with pytest.raises(RuntimeError, match="invalid npm registry metadata"):
+            _get_package_registry_latest_version(spec, client)
 
 
 class TestGetComparableLatestVersion:
@@ -222,10 +249,13 @@ class TestGetComparableLatestVersion:
         with patch("ptm.resolver.get_url_release_version", return_value="v22.0.0"):
             assert get_comparable_latest_version(spec, client) == "22.0.0"
 
-    def test_fetches_npm_version(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_fetches_npm_registry_version(self, tool_type: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=tool_type)
         client = MagicMock()
-        with patch("ptm.resolver.get_npm_latest_version", return_value="0.15.0"):
+        with patch(
+            "ptm.resolver._get_package_registry_latest_version", return_value="0.15.0"
+        ):
             assert get_comparable_latest_version(spec, client) == "0.15.0"
 
 
