@@ -219,7 +219,7 @@ def resolve_github_release_asset(
         return ResolvedAsset(
             name=asset,
             url=f"https://github.com/{spec.repo}/releases/download/{tag}/{asset}",
-            extract=_infer_extract_type(asset, spec.opt_dir),
+            extract=_infer_extract_type(asset, spec),
         )
     return _resolve_github_release_asset_automatically(spec, tag, client)
 
@@ -256,7 +256,7 @@ def _resolve_github_release_asset_from_release(
                 ResolvedAsset(
                     name=name,
                     url=download_url,
-                    extract=_infer_extract_type(name, spec.opt_dir),
+                    extract=_infer_extract_type(name, spec),
                 ),
             )
         )
@@ -357,9 +357,10 @@ def _has_arch_token(asset_name: str) -> bool:
     )
 
 
-def _infer_extract_type(asset_name: str, opt_dir: str) -> str:
+def _infer_extract_type(asset_name: str, spec: ToolSpec) -> str:
     if asset_name.endswith((".tar.gz", ".tar.xz")):
-        return "tar" if opt_dir else "tar_binary"
+        full_archive = bool(spec.bin_path_in_archive or spec.extra_bins)
+        return "tar" if full_archive else "tar_binary"
     if asset_name.endswith(".gz"):
         return "gz_binary"
     if asset_name.endswith(".zip"):
@@ -380,7 +381,7 @@ def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
     return ResolvedAsset(
         name=url.rsplit("/", maxsplit=1)[-1],
         url=url,
-        extract=_infer_extract_type(url, spec.opt_dir),
+        extract=_infer_extract_type(url, spec),
     )
 
 
@@ -390,7 +391,7 @@ def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
 
 def _resolve_known_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
     if _uses_node_dist_index(spec):
-        return _resolve_node_dist_asset(version, spec.opt_dir)
+        return _resolve_node_dist_asset(version, spec)
     raise RuntimeError(
         f"{spec.bin}: no URL template for platform '{detect_platform()}'; "
         "set [tools.<name>.platforms] to configure explicit download URLs"
@@ -403,7 +404,7 @@ def _uses_node_dist_index(spec: ToolSpec) -> bool:
     )
 
 
-def _resolve_node_dist_asset(version: str, opt_dir: str) -> ResolvedAsset:
+def _resolve_node_dist_asset(version: str, spec: ToolSpec) -> ResolvedAsset:
     platform_key = detect_platform()
     platform_alias = _NODE_DIST_PLATFORM_ALIASES.get(platform_key)
     if platform_alias is None:
@@ -418,5 +419,5 @@ def _resolve_node_dist_asset(version: str, opt_dir: str) -> ResolvedAsset:
     return ResolvedAsset(
         name=filename,
         url=url,
-        extract=_infer_extract_type(filename, opt_dir),
+        extract=_infer_extract_type(filename, spec),
     )

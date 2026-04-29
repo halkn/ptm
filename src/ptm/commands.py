@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import httpx
 from rich.table import Table
 
+from ptm.cleaner import apply_clean_candidate, find_clean_candidates
 from ptm.console import console
 from ptm.installer import do_install
 from ptm.models import InstallPlan, ToolSpec
@@ -195,3 +196,35 @@ def cmd_check(tools: list[ToolSpec], client: httpx.Client) -> None:
         table.add_row(check.spec.bin, installed_str, check.latest or "-", check.status)
 
     console.print(table)
+
+
+def cmd_clean(tools: list[ToolSpec], apply: bool = False) -> None:
+    candidates = find_clean_candidates(tools)
+    if not candidates:
+        console.print("[dim]No tools to clean.[/dim]")
+        return
+
+    table = Table(title="Clean Candidates")
+    table.add_column("Bin", style="cyan")
+    table.add_column("Directory")
+    table.add_column("Action")
+    action = "remove" if apply else "dry-run"
+
+    failed = False
+    for candidate in candidates:
+        table.add_row(candidate.bin, str(candidate.tool_dir), action)
+
+    console.print(table)
+
+    if not apply:
+        console.print("[dim]Run with --apply to remove these tools.[/dim]")
+        return
+
+    for candidate in candidates:
+        try:
+            apply_clean_candidate(candidate.tool_dir)
+        except Exception as e:
+            console.print(f"  [red]{candidate.bin}: clean failed: {e}[/red]")
+            failed = True
+    if failed:
+        sys.exit(1)

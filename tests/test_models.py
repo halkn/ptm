@@ -19,15 +19,24 @@ class TestToolSpecInferExtract:
         spec = ToolSpec(bin="tool")
         assert spec.extract == "raw_binary"
 
-    def test_tar_gz_without_opt_dir_returns_tar_binary(self):
+    def test_tar_gz_without_archive_paths_returns_tar_binary(self):
         spec = ToolSpec(bin="rg", platforms={"linux-x86_64": "rg.tar.gz"})
         assert spec.extract == "tar_binary"
 
-    def test_tar_gz_with_opt_dir_returns_tar(self):
+    def test_tar_gz_with_bin_path_in_archive_returns_tar(self):
         spec = ToolSpec(
             bin="nvim",
             platforms={"linux-x86_64": "nvim.tar.gz"},
-            opt_dir="~/.local/opt/neovim",
+            bin_path_in_archive="bin/nvim",
+        )
+        assert spec.extract == "tar"
+
+    def test_tar_gz_with_extra_bins_returns_tar(self):
+        spec = ToolSpec(
+            bin="node",
+            platforms={"linux-x86_64": "node.tar.xz"},
+            bin_path_in_archive="bin/node",
+            extra_bins=["npm", "npx"],
         )
         assert spec.extract == "tar"
 

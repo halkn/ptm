@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ptm.commands import cmd_check, cmd_install, cmd_list, cmd_update
+from ptm.commands import cmd_check, cmd_clean, cmd_install, cmd_list, cmd_update
 from ptm.models import InstallPlan, ToolSpec
 from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 
@@ -355,3 +355,36 @@ class TestCmdCheck:
 
         table = mock_print.call_args.args[0]
         assert table.columns[0]._cells == ["rg", "fd"]
+
+
+# ---- cmd_clean --------------------------------------------------------------
+
+
+class TestCmdClean:
+    def test_dry_run_does_not_remove_candidates(self):
+        tools = [_make_spec(bin="rg")]
+        candidate = MagicMock()
+        candidate.bin = "fd"
+        candidate.tool_dir = "/tmp/ptm/tools/fd"
+
+        with (
+            patch("ptm.commands.find_clean_candidates", return_value=[candidate]),
+            patch("ptm.commands.apply_clean_candidate") as mock_apply,
+        ):
+            cmd_clean(tools, apply=False)
+
+        mock_apply.assert_not_called()
+
+    def test_apply_removes_candidates(self):
+        tools = [_make_spec(bin="rg")]
+        candidate = MagicMock()
+        candidate.bin = "fd"
+        candidate.tool_dir = "/tmp/ptm/tools/fd"
+
+        with (
+            patch("ptm.commands.find_clean_candidates", return_value=[candidate]),
+            patch("ptm.commands.apply_clean_candidate") as mock_apply,
+        ):
+            cmd_clean(tools, apply=True)
+
+        mock_apply.assert_called_once_with(candidate.tool_dir)

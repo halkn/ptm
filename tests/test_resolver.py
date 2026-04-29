@@ -603,7 +603,8 @@ class TestResolveUrlReleaseUrl:
             bin="node",
             type="url_release",
             version_url="https://nodejs.org/dist/index.json",
-            opt_dir="~/.local/opt/node",
+            bin_path_in_archive="bin/node",
+            extra_bins=["npm", "npx", "corepack"],
         )
         with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
             asset = resolve_url_release_asset(spec, "v22.0.0")

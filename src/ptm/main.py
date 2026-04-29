@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 
-from ptm.commands import cmd_check, cmd_install, cmd_list, cmd_update
+from ptm.commands import cmd_check, cmd_clean, cmd_install, cmd_list, cmd_update
 from ptm.config import DEFAULT_TOOLS_TOML, load_tools
 
 
@@ -35,12 +35,23 @@ def main() -> None:
 
     subparsers.add_parser("list", help="List all tools with installed version")
     subparsers.add_parser("check", help="Compare installed vs latest version")
+    p_clean = subparsers.add_parser(
+        "clean", help="Remove ptm-managed tools missing from config"
+    )
+    p_clean.add_argument(
+        "--apply",
+        action="store_true",
+        help="Remove clean candidates. Defaults to dry-run.",
+    )
 
     args = parser.parse_args()
     tools = load_tools(args.config)
 
     if args.command == "list":
         cmd_list(tools)
+        return
+    if args.command == "clean":
+        cmd_clean(tools, apply=args.apply)
         return
 
     with httpx.Client(follow_redirects=True, timeout=120.0) as client:

@@ -22,16 +22,16 @@ just check
 
 Available tasks:
 
-| Task                | Description                                  |
-| ------------------- | -------------------------------------------- |
-| `just setup`        | Set up runtime and development dependencies  |
-| `just check`        | Run all local checks                         |
-| `just lint`         | Check linting and import order               |
-| `just format`       | Format source and test files                 |
-| `just format-check` | Check formatting without modifying files     |
-| `just typecheck`    | Run type checks                              |
-| `just test`         | Run tests with coverage enabled              |
-| `just smoke`        | Run a quick CLI smoke test                   |
+| Task                | Description                                 |
+| ------------------- | ------------------------------------------- |
+| `just setup`        | Set up runtime and development dependencies |
+| `just check`        | Run all local checks                        |
+| `just lint`         | Check linting and import order              |
+| `just format`       | Format source and test files                |
+| `just format-check` | Check formatting without modifying files    |
+| `just typecheck`    | Run type checks                             |
+| `just test`         | Run tests with coverage enabled             |
+| `just smoke`        | Run a quick CLI smoke test                  |
 
 ## Usage
 
@@ -41,12 +41,13 @@ ptm [--config PATH] <command> [tool]
 
 ### Commands
 
-| Command              | Description                                              |
-| -------------------- | -------------------------------------------------------- |
-| `ptm install [tool]` | Install tools, skipping tools that are already installed |
-| `ptm update [tool]`  | Update tools to the latest version                       |
-| `ptm list`           | List managed tools and their current versions            |
-| `ptm check`          | Compare installed versions with the latest versions      |
+| Command               | Description                                              |
+| --------------------- | -------------------------------------------------------- |
+| `ptm install [tool]`  | Install tools, skipping tools that are already installed |
+| `ptm update [tool]`   | Update tools to the latest version                       |
+| `ptm list`            | List managed tools and their current versions            |
+| `ptm check`           | Compare installed versions with the latest versions      |
+| `ptm clean [--apply]` | Remove ptm-managed tools that are no longer configured   |
 
 If `[tool]` is omitted, the command runs for all configured tools.
 
@@ -62,6 +63,12 @@ ptm update
 
 # Check versions
 ptm check
+
+# Show tools that would be removed
+ptm clean
+
+# Remove tools that are no longer configured
+ptm clean --apply
 ```
 
 ### Options
@@ -76,12 +83,27 @@ ptm --config ~/dotfiles/config.toml install
 
 ### Environment Variables
 
-| Variable       | Description                                                       |
-| -------------- | ----------------------------------------------------------------- |
-| `PTM_CONFIG`   | Override the default config file path                             |
-| `XDG_BIN_HOME` | Set the binary installation directory. Defaults to `~/.local/bin` |
+| Variable        | Description                                                          |
+| --------------- | -------------------------------------------------------------------- |
+| `PTM_CONFIG`    | Override the default config file path                                |
+| `XDG_BIN_HOME`  | Set the binary installation directory. Defaults to `~/.local/bin`    |
+| `XDG_DATA_HOME` | Set the managed tool installation root. Defaults to `~/.local/share` |
 
 When fetching GitHub Releases, `ptm` prefers the `gh` command. If you have already run `gh auth login`, `ptm` uses those credentials and fetches release information through `gh api`. If `gh` is not installed or is not authenticated, `ptm` falls back to the GitHub REST API.
+
+## Managed Files and Cleaning
+
+For `github_release` and `url_release` tools, `ptm` stores the actual installed files under:
+
+```text
+${XDG_DATA_HOME:-~/.local/share}/ptm/tools/<bin>/current
+```
+
+`$XDG_BIN_HOME` contains symlinks to those managed files. This keeps `ptm` from deleting commands that were installed by other tools into the same bin directory.
+
+`ptm clean` compares the managed tool directories with the current config and shows release tools that are no longer configured. It is a dry-run by default; pass `--apply` to remove the managed tool directory and only the symlinks that point into it.
+
+Tools installed before this managed-root layout are not adopted automatically. `installer`, `npm`, and `bun` tools are not cleaned in this version because their install locations are controlled outside `ptm`.
 
 ## Configuration
 
@@ -116,8 +138,7 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 | `version`             |          | Version to install. Defaults to `latest`; `nightly` is also supported                    |
 | `version_regex`       |          | Regular expression used to extract the version string                                    |
 | `version_cmd`         |          | Version check command. Defaults to `[bin, "--version"]`                                  |
-| `opt_dir`             |          | Directory where the full archive is extracted. Tar archives only                         |
-| `bin_path_in_archive` |          | Binary path inside the archive when `opt_dir` is set                                     |
+| `bin_path_in_archive` |          | Binary path inside the archive when the full archive should be extracted                 |
 | `strip_components`    |          | Number of leading path components to strip when extracting tar archives. Defaults to `1` |
 | `extra_bins`          |          | Additional binary names to symlink                                                       |
 
@@ -128,14 +149,13 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 - `{tag}` - Tag name, for example `v1.2.3`
 - `{version}` - Version without the leading `v`, for example `1.2.3`
 
-**Extracting a full archive with `opt_dir`:**
+**Extracting a full archive:**
 
 ```toml
 [tools.nvim]
 type = "github_release"
 repo = "neovim/neovim"
 version = "nightly"
-opt_dir = "~/.local/opt/neovim"
 bin_path_in_archive = "bin/nvim"
 version_regex = 'NVIM v([\d.]+-dev[^\s]*|[\d.]+)'
 
@@ -156,7 +176,6 @@ type = "url_release"
 version = "lts"
 version_url = "https://nodejs.org/dist/index.json"
 version_url_regex = '"version":"(v[\d.]+)"[^}]*"lts":"'
-opt_dir = "~/.local/opt/node"
 bin_path_in_archive = "bin/node"
 strip_components = 1
 extra_bins = ["npm", "npx", "corepack"]
