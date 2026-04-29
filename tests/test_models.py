@@ -1,4 +1,7 @@
+import pytest
+
 from ptm.models import ToolSpec
+from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 
 
 class TestToolSpecVersionCmd:
@@ -70,11 +73,13 @@ class TestToolSpecFromDict:
         assert spec.type == "github_release"
 
 
-class TestToolSpecNpm:
-    def test_defaults_package_to_bin(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+class TestToolSpecNpmRegistryPackage:
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_defaults_package_to_bin(self, tool_type: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=tool_type)
         assert spec.package == "markdownlint-cli2"
 
-    def test_preserves_explicit_package(self):
-        spec = ToolSpec(bin="tsc", type="npm", package="typescript")
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_preserves_explicit_package(self, tool_type: str):
+        spec = ToolSpec(bin="tsc", type=tool_type, package="typescript")
         assert spec.package == "typescript"

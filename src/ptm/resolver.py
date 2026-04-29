@@ -7,6 +7,7 @@ from urllib.parse import quote
 import httpx
 
 from ptm.models import InstallPlan, ToolSpec
+from ptm.package_managers import is_npm_registry_package_type
 
 
 @dataclass(frozen=True)
@@ -70,13 +71,21 @@ def version_status(installed: str | None, latest: str) -> str:
     return "[yellow]outdated[/yellow]"
 
 
-def get_npm_latest_version(spec: ToolSpec) -> str:
-    out = subprocess.check_output(
-        ["npm", "view", spec.package, "version"],
-        stderr=subprocess.STDOUT,
-        text=True,
+def _get_package_registry_latest_version(spec: ToolSpec, client: httpx.Client) -> str:
+    package = quote(spec.package, safe="@")
+    resp = client.get(
+        f"https://registry.npmjs.org/{package}",
+        headers={"Accept": "application/vnd.npm.install-v1+json"},
     )
-    return out.strip().removeprefix("v")
+    resp.raise_for_status()
+    data = resp.json()
+    dist_tags = data.get("dist-tags")
+    if not isinstance(dist_tags, dict):
+        raise RuntimeError(f"{spec.package}: invalid npm registry metadata")
+    latest = dist_tags.get("latest")
+    if not isinstance(latest, str) or not latest:
+        raise RuntimeError(f"{spec.package}: invalid npm registry metadata")
+    return latest.removeprefix("v")
 
 
 def resolve_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
@@ -84,8 +93,8 @@ def resolve_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
         if not spec.version_url:
             return None
         return get_url_release_version(spec, client)
-    if spec.type == "npm":
-        return get_npm_latest_version(spec)
+    if is_npm_registry_package_type(spec.type):
+        return _get_package_registry_latest_version(spec, client)
     if spec.type == "url_release":
         return get_url_release_version(spec, client)
     return get_latest_tag(spec, client)
@@ -94,7 +103,9 @@ def resolve_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
 def get_comparable_version(spec: ToolSpec, version: str | None) -> str | None:
     if version is None or spec.version == "nightly":
         return None
-    if spec.type in {"github_release", "url_release", "installer", "npm"}:
+    if spec.type in {"github_release", "url_release", "installer"} or (
+        is_npm_registry_package_type(spec.type)
+    ):
         return version.removeprefix("v")
     return version
 
@@ -128,7 +139,9 @@ def resolve_install_plan(spec: ToolSpec, client: httpx.Client) -> InstallPlan:
                 url=asset.url,
                 extract=asset.extract,
             )
-        case "installer" | "npm":
+        case "installer":
+            return InstallPlan(spec=spec, version=resolve_latest_version(spec, client))
+        case _ if is_npm_registry_package_type(spec.type):
             return InstallPlan(spec=spec, version=resolve_latest_version(spec, client))
         case _:
             raise ValueError(f"Unknown type: {spec.type}")

@@ -1,10 +1,12 @@
 from dataclasses import dataclass, field
 
+from ptm.package_managers import is_npm_registry_package_type
+
 
 @dataclass
 class ToolSpec:
     bin: str = ""
-    # "github_release" | "url_release" | "installer" | "npm"
+    # "github_release" | "url_release" | "installer" | "npm" | "bun"
     type: str = "github_release"
     version: str = "latest"
     version_cmd: list[str] = field(default_factory=list)
@@ -25,7 +27,7 @@ class ToolSpec:
     url: str = ""
     command: str = ""
     update_command: str = ""
-    # npm 専用
+    # npm / bun 専用
     package: str = ""
 
     def __post_init__(self) -> None:
@@ -33,7 +35,7 @@ class ToolSpec:
             raise ValueError("ToolSpec.bin must not be empty")
         if not self.version_cmd:
             self.version_cmd = [self.bin, "--version"]
-        if self.type == "npm" and not self.package:
+        if is_npm_registry_package_type(self.type) and not self.package:
             self.package = self.bin
         if not self.extract:
             self.extract = self._infer_extract()

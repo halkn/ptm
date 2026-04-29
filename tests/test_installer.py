@@ -19,11 +19,12 @@ from ptm.installer import (
     _install_tar_binary,
     _install_zip_binary,
     _run_installer,
-    _run_npm_install,
+    _run_package_manager_install,
     _strip_components,
     do_install,
 )
 from ptm.models import InstallPlan, ToolSpec
+from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 
 # ---- helpers ----------------------------------------------------------------
 
@@ -312,31 +313,49 @@ class TestRunInstaller:
         assert "https://astral.sh/uv/install.sh" in args
 
 
-class TestRunNpmInstall:
-    def test_runs_npm_install(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+class TestRunPackageManagerInstall:
+    @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_runs_install(self, manager: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=manager)
         with patch("subprocess.run") as mock_run:
-            _run_npm_install(spec)
+            _run_package_manager_install(spec, manager)
         mock_run.assert_called_once_with(
-            ["npm", "install", "-g", "markdownlint-cli2"],
+            [
+                manager,
+                NPM_REGISTRY_PACKAGE_MANAGERS[manager].install_command,
+                "-g",
+                "markdownlint-cli2",
+            ],
             check=True,
         )
 
-    def test_runs_npm_update_when_updating(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+    @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_runs_update_when_updating(self, manager: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=manager)
         with patch("subprocess.run") as mock_run:
-            _run_npm_install(spec, update=True)
+            _run_package_manager_install(spec, manager, update=True)
         mock_run.assert_called_once_with(
-            ["npm", "update", "-g", "markdownlint-cli2"],
+            [
+                manager,
+                NPM_REGISTRY_PACKAGE_MANAGERS[manager].update_command,
+                "-g",
+                "markdownlint-cli2",
+            ],
             check=True,
         )
 
-    def test_uses_package_name_when_set(self):
-        spec = ToolSpec(bin="tsc", type="npm", package="typescript")
+    @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_uses_package_name_when_set(self, manager: str):
+        spec = ToolSpec(bin="tsc", type=manager, package="typescript")
         with patch("subprocess.run") as mock_run:
-            _run_npm_install(spec)
+            _run_package_manager_install(spec, manager)
         mock_run.assert_called_once_with(
-            ["npm", "install", "-g", "typescript"],
+            [
+                manager,
+                NPM_REGISTRY_PACKAGE_MANAGERS[manager].install_command,
+                "-g",
+                "typescript",
+            ],
             check=True,
         )
 
@@ -459,15 +478,16 @@ class TestDoInstall:
             do_install(spec, client, update=True)
         mock_run.assert_called_once_with(spec, update=True)
 
-    def test_runs_npm_installer(self):
-        spec = ToolSpec(bin="markdownlint-cli2", type="npm")
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_runs_package_manager_installer(self, tool_type: str):
+        spec = ToolSpec(bin="markdownlint-cli2", type=tool_type)
         client = MagicMock()
         with (
-            patch("ptm.installer._run_npm_install") as mock_run,
+            patch("ptm.installer._run_package_manager_install") as mock_run,
             patch("ptm.installer.get_installed_version", return_value="0.15.0"),
         ):
             do_install(spec, client)
-        mock_run.assert_called_once_with(spec, update=False)
+        mock_run.assert_called_once_with(spec, tool_type, update=False)
 
     def test_prints_error_on_failure(self, capsys: pytest.CaptureFixture):
         spec = ToolSpec(bin="rg", type="github_release")

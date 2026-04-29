@@ -15,6 +15,7 @@ import httpx
 from ptm.config import BIN_DIR
 from ptm.console import console
 from ptm.models import InstallPlan, ToolSpec
+from ptm.package_managers import get_package_manager, is_npm_registry_package_type
 from ptm.resolver import get_installed_version, resolve_install_plan
 
 
@@ -183,9 +184,14 @@ def _run_installer(spec: ToolSpec, update: bool = False) -> None:
         )
 
 
-def _run_npm_install(spec: ToolSpec, update: bool = False) -> None:
-    action = "update" if update else "install"
-    cmd = ["npm", action, "-g", spec.package]
+def _run_package_manager_install(
+    spec: ToolSpec, manager: str, update: bool = False
+) -> None:
+    package_manager = get_package_manager(manager)
+    action = (
+        package_manager.update_command if update else package_manager.install_command
+    )
+    cmd = [manager, action, "-g", spec.package]
     console.print(f"  Running: {shlex.join(cmd)}")
     subprocess.run(cmd, check=True)
 
@@ -206,8 +212,8 @@ def do_install(
                 _install_release_plan(resolved_plan, client)
             case "installer":
                 _run_installer(spec, update=update)
-            case "npm":
-                _run_npm_install(spec, update=update)
+            case _ if is_npm_registry_package_type(spec.type):
+                _run_package_manager_install(spec, spec.type, update=update)
             case _:
                 raise ValueError(f"Unknown type: {spec.type}")
         console.print(f"  [green]Done.[/green] {get_installed_version(spec) or ''}")
