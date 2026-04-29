@@ -17,10 +17,63 @@ from ptm.console import console
 from ptm.models import InstallPlan, ToolSpec
 from ptm.package_managers import get_package_manager, is_npm_registry_package_type
 from ptm.resolver import get_installed_version, resolve_install_plan
+from ptm.store import PTM_TOOLS_DIR, get_current_dir, get_tool_dir, write_tool_metadata
 
 
 def _make_executable(path: Path) -> None:
     path.chmod(path.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def _prepare_managed_staging_dir(spec: ToolSpec) -> Path:
+    staging_dir = get_tool_dir(spec.bin, PTM_TOOLS_DIR) / "next"
+    if staging_dir.exists() or staging_dir.is_symlink():
+        shutil.rmtree(staging_dir)
+    staging_dir.mkdir(parents=True, exist_ok=True)
+    return staging_dir
+
+
+def _activate_managed_current_dir(spec: ToolSpec, staging_dir: Path) -> Path:
+    tool_dir = get_tool_dir(spec.bin, PTM_TOOLS_DIR)
+    current_dir = tool_dir / "current"
+    backup_dir = tool_dir / "previous"
+
+    if backup_dir.exists() or backup_dir.is_symlink():
+        shutil.rmtree(backup_dir)
+    if current_dir.exists() or current_dir.is_symlink():
+        current_dir.rename(backup_dir)
+
+    try:
+        staging_dir.rename(current_dir)
+    except Exception:
+        if backup_dir.exists():
+            backup_dir.rename(current_dir)
+        raise
+
+    if backup_dir.exists():
+        shutil.rmtree(backup_dir)
+    return current_dir
+
+
+def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
+    BIN_DIR.mkdir(parents=True, exist_ok=True)
+    bin_path = Path(spec.bin_path_in_archive or spec.bin)
+    bin_dir_in_archive = bin_path.parent
+    link_targets = [(BIN_DIR / spec.bin, current_dir / bin_path)]
+    link_targets.extend(
+        (BIN_DIR / extra, current_dir / bin_dir_in_archive / extra)
+        for extra in spec.extra_bins
+    )
+
+    for _link, target in link_targets:
+        if not target.exists():
+            raise FileNotFoundError(f"{target} not found")
+
+    for link, _target in link_targets:
+        link.unlink(missing_ok=True)
+
+    for link, target in link_targets:
+        link.symlink_to(target)
+    return [link for link, _target in link_targets]
 
 
 def _download(url: str, dest: Path, client: httpx.Client) -> None:
@@ -53,43 +106,23 @@ def _extract_binary_from_tar(archive: Path, bin_name: str, dest: Path) -> None:
 
 
 def _install_tar(spec: ToolSpec, url: str, client: httpx.Client) -> None:
-    opt_dir = Path(spec.opt_dir).expanduser()
-    backup = opt_dir.with_name(opt_dir.name + ".bak")
-
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir) / "archive.tar"
         console.print(f"  Downloading {url}")
         _download(url, tmp_path, client)
 
-        if opt_dir.exists():
-            opt_dir.rename(backup)
-        opt_dir.mkdir(parents=True, exist_ok=True)
+        dest_dir = _prepare_managed_staging_dir(spec)
 
         try:
             with tarfile.open(tmp_path, "r:*") as tf:
                 members = list(
                     _strip_components(tf.getmembers(), spec.strip_components)
                 )
-                tf.extractall(opt_dir, members=members, filter="data")
+                tf.extractall(dest_dir, members=members, filter="data")
+            _activate_managed_current_dir(spec, dest_dir)
         except Exception:
-            if backup.exists():
-                shutil.rmtree(opt_dir, ignore_errors=True)
-                backup.rename(opt_dir)
+            shutil.rmtree(dest_dir, ignore_errors=True)
             raise
-
-        if backup.exists():
-            shutil.rmtree(backup)
-
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    bin_link = BIN_DIR / spec.bin
-    bin_link.unlink(missing_ok=True)
-    bin_link.symlink_to(opt_dir / spec.bin_path_in_archive)
-
-    bin_dir_in_archive = Path(spec.bin_path_in_archive).parent
-    for extra in spec.extra_bins:
-        link = BIN_DIR / extra
-        link.unlink(missing_ok=True)
-        link.symlink_to(opt_dir / bin_dir_in_archive / extra)
 
 
 def _install_tar_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -98,11 +131,15 @@ def _install_tar_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_path, client)
 
-        BIN_DIR.mkdir(parents=True, exist_ok=True)
-        _extract_binary_from_tar(tmp_path, spec.bin, BIN_DIR)
-
-    dest = BIN_DIR / spec.bin
-    _make_executable(dest)
+        staging_dir = _prepare_managed_staging_dir(spec)
+        try:
+            _extract_binary_from_tar(tmp_path, spec.bin, staging_dir)
+            dest = staging_dir / spec.bin
+            _make_executable(dest)
+            _activate_managed_current_dir(spec, staging_dir)
+        except Exception:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
 
 
 def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -111,12 +148,16 @@ def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_gz, client)
 
-        BIN_DIR.mkdir(parents=True, exist_ok=True)
-        dest = BIN_DIR / spec.bin
-        with gzip.open(tmp_gz, "rb") as gz_in:
-            dest.write_bytes(gz_in.read())
-
-    _make_executable(dest)
+        staging_dir = _prepare_managed_staging_dir(spec)
+        try:
+            dest = staging_dir / spec.bin
+            with gzip.open(tmp_gz, "rb") as gz_in:
+                dest.write_bytes(gz_in.read())
+            _make_executable(dest)
+            _activate_managed_current_dir(spec, staging_dir)
+        except Exception:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
 
 
 def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -125,24 +166,35 @@ def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_zip, client)
 
-        BIN_DIR.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(tmp_zip) as zf:
-            for info in zf.infolist():
-                if Path(info.filename).name == spec.bin and not info.is_dir():
-                    data = zf.read(info.filename)
-                    dest = BIN_DIR / spec.bin
-                    dest.write_bytes(data)
-                    _make_executable(dest)
-                    return
+        staging_dir = _prepare_managed_staging_dir(spec)
+        try:
+            with zipfile.ZipFile(tmp_zip) as zf:
+                for info in zf.infolist():
+                    if Path(info.filename).name == spec.bin and not info.is_dir():
+                        data = zf.read(info.filename)
+                        dest = staging_dir / spec.bin
+                        dest.write_bytes(data)
+                        _make_executable(dest)
+                        _activate_managed_current_dir(spec, staging_dir)
+                        return
+        except Exception:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            raise
+        shutil.rmtree(staging_dir, ignore_errors=True)
     raise FileNotFoundError(f"{spec.bin} not found in zip archive")
 
 
 def _install_raw_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
-    BIN_DIR.mkdir(parents=True, exist_ok=True)
-    dest = BIN_DIR / spec.bin
+    staging_dir = _prepare_managed_staging_dir(spec)
+    dest = staging_dir / spec.bin
     console.print(f"  Downloading {url}")
-    _download(url, dest, client)
-    _make_executable(dest)
+    try:
+        _download(url, dest, client)
+        _make_executable(dest)
+        _activate_managed_current_dir(spec, staging_dir)
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
 
 
 def _dispatch_extract(
@@ -168,6 +220,10 @@ def _install_release_plan(plan: InstallPlan, client: httpx.Client) -> None:
     if plan.url is None:
         raise ValueError(f"{plan.spec.bin}: install URL is not resolved")
     _dispatch_extract(plan.spec, plan.url, client, extract=plan.extract)
+    current_dir = get_current_dir(plan.spec.bin, PTM_TOOLS_DIR)
+    links = _publish_release_links(plan.spec, current_dir)
+    tool_dir = get_tool_dir(plan.spec.bin, PTM_TOOLS_DIR)
+    write_tool_metadata(plan.spec, tool_dir, links)
 
 
 def _run_installer(spec: ToolSpec, update: bool = False) -> None:

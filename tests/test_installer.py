@@ -112,17 +112,18 @@ class TestInstallRawBinary:
     def test_writes_file_and_sets_executable(self, tmp_path: Path):
         spec = ToolSpec(bin="shfmt", platforms={"linux-x86_64": "shfmt"})
         client = MagicMock()
+        tools_dir = tmp_path / "tools"
 
         def _write_bin(url: str, dest: Path, c: MagicMock) -> None:
             dest.write_bytes(b"bin")
 
         with (
-            patch("ptm.installer.BIN_DIR", tmp_path),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch("ptm.installer._download", side_effect=_write_bin),
         ):
             _install_raw_binary(spec, "https://example.com/shfmt", client)
 
-        dest = tmp_path / "shfmt"
+        dest = tools_dir / "shfmt" / "current" / "shfmt"
         assert dest.exists()
         assert _is_executable(dest)
 
@@ -135,9 +136,10 @@ class TestInstallGzBinary:
         spec = ToolSpec(bin="tree-sitter", platforms={"linux-x86_64": "tree-sitter.gz"})
         gz_path = _make_gz(tmp_path, b"ts-binary")
         client = MagicMock()
+        tools_dir = tmp_path / "tools"
 
         with (
-            patch("ptm.installer.BIN_DIR", tmp_path),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch(
                 "ptm.installer._download",
                 side_effect=lambda url, dest, c: dest.write_bytes(gz_path.read_bytes()),
@@ -145,7 +147,7 @@ class TestInstallGzBinary:
         ):
             _install_gz_binary(spec, "https://example.com/tree-sitter.gz", client)
 
-        dest = tmp_path / "tree-sitter"
+        dest = tools_dir / "tree-sitter" / "current" / "tree-sitter"
         assert dest.read_bytes() == b"ts-binary"
         assert _is_executable(dest)
 
@@ -158,9 +160,10 @@ class TestInstallTarBinary:
         spec = ToolSpec(bin="rg", platforms={"linux-x86_64": "rg.tar.gz"})
         archive = _make_tar_gz(tmp_path, "rg", b"rg-binary")
         client = MagicMock()
+        tools_dir = tmp_path / "tools"
 
         with (
-            patch("ptm.installer.BIN_DIR", tmp_path),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch(
                 "ptm.installer._download",
                 side_effect=lambda url, dest, c: dest.write_bytes(archive.read_bytes()),
@@ -168,7 +171,7 @@ class TestInstallTarBinary:
         ):
             _install_tar_binary(spec, "https://example.com/rg.tar.gz", client)
 
-        dest = tmp_path / "rg"
+        dest = tools_dir / "rg" / "current" / "rg"
         assert dest.read_bytes() == b"rg-binary"
         assert _is_executable(dest)
 
@@ -181,9 +184,10 @@ class TestInstallZipBinary:
         spec = ToolSpec(bin="gh", platforms={"linux-x86_64": "gh.zip"})
         archive = _make_zip(tmp_path, "gh", b"gh-binary")
         client = MagicMock()
+        tools_dir = tmp_path / "tools"
 
         with (
-            patch("ptm.installer.BIN_DIR", tmp_path),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch(
                 "ptm.installer._download",
                 side_effect=lambda url, dest, c: dest.write_bytes(archive.read_bytes()),
@@ -191,7 +195,7 @@ class TestInstallZipBinary:
         ):
             _install_zip_binary(spec, "https://example.com/gh.zip", client)
 
-        dest = tmp_path / "gh"
+        dest = tools_dir / "gh" / "current" / "gh"
         assert dest.read_bytes() == b"gh-binary"
         assert _is_executable(dest)
 
@@ -199,9 +203,10 @@ class TestInstallZipBinary:
         spec = ToolSpec(bin="gh", platforms={"linux-x86_64": "gh.zip"})
         archive = _make_zip(tmp_path, "other-bin")
         client = MagicMock()
+        tools_dir = tmp_path / "tools"
 
         with (
-            patch("ptm.installer.BIN_DIR", tmp_path),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch(
                 "ptm.installer._download",
                 side_effect=lambda url, dest, c: dest.write_bytes(archive.read_bytes()),
@@ -230,13 +235,12 @@ class TestInstallTar:
         archive.write_bytes(buf.getvalue())
         return archive
 
-    def test_extracts_to_opt_dir_and_creates_symlink(self, tmp_path: Path):
-        opt_dir = tmp_path / "opt" / "neovim"
+    def test_extracts_to_managed_current_dir(self, tmp_path: Path):
         bin_dir = tmp_path / "bin"
+        tools_dir = tmp_path / "tools"
         spec = ToolSpec(
             bin="nvim",
             platforms={"linux-x86_64": "nvim.tar.gz"},
-            opt_dir=str(opt_dir),
             bin_path_in_archive="bin/nvim",
             strip_components=1,
         )
@@ -245,6 +249,7 @@ class TestInstallTar:
 
         with (
             patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
             patch(
                 "ptm.installer._download",
                 side_effect=lambda url, dest, c: dest.write_bytes(archive.read_bytes()),
@@ -252,19 +257,16 @@ class TestInstallTar:
         ):
             _install_tar(spec, "https://example.com/nvim.tar.gz", client)
 
-        symlink = bin_dir / "nvim"
-        assert symlink.is_symlink()
-        assert symlink.resolve() == (opt_dir / "bin" / "nvim").resolve()
+        assert (tools_dir / "nvim" / "current" / "bin" / "nvim").exists()
 
     def test_restores_backup_on_failure(self, tmp_path: Path):
-        opt_dir = tmp_path / "opt" / "neovim"
-        opt_dir.mkdir(parents=True)
-        (opt_dir / "old_file").write_text("original")
+        current_dir = tmp_path / "tools" / "nvim" / "current"
+        current_dir.mkdir(parents=True)
+        (current_dir / "old_file").write_text("original")
         bin_dir = tmp_path / "bin"
         spec = ToolSpec(
             bin="nvim",
             platforms={"linux-x86_64": "nvim.tar.gz"},
-            opt_dir=str(opt_dir),
             bin_path_in_archive="bin/nvim",
         )
         client = MagicMock()
@@ -274,13 +276,14 @@ class TestInstallTar:
 
         with (
             patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tmp_path / "tools"),
             patch("ptm.installer._download", side_effect=_write_invalid),
             pytest.raises(tarfile.TarError),
         ):
             _install_tar(spec, "https://example.com/nvim.tar.gz", client)
 
-        assert opt_dir.exists()
-        assert (opt_dir / "old_file").read_text() == "original"
+        assert current_dir.exists()
+        assert (current_dir / "old_file").read_text() == "original"
 
 
 # ---- _run_installer ---------------------------------------------------------
@@ -506,7 +509,7 @@ class TestDoInstall:
 
 
 class TestInstallReleasePlan:
-    def test_dispatches_extract_from_plan(self):
+    def test_dispatches_extract_from_plan(self, tmp_path: Path):
         spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
         plan = InstallPlan(
             spec=spec,
@@ -515,8 +518,80 @@ class TestInstallReleasePlan:
             extract="tar_binary",
         )
         client = MagicMock()
-        with patch("ptm.installer._dispatch_extract") as mock_dispatch:
+        current = tmp_path / "tools" / "rg" / "current"
+        current.mkdir(parents=True)
+        (current / "rg").write_text("rg", encoding="utf-8")
+        with (
+            patch("ptm.installer.BIN_DIR", tmp_path / "bin"),
+            patch("ptm.installer.PTM_TOOLS_DIR", tmp_path / "tools"),
+            patch("ptm.installer._dispatch_extract") as mock_dispatch,
+        ):
             _install_release_plan(plan, client)
         mock_dispatch.assert_called_once_with(
             spec, "https://example.com/rg.tar.gz", client, extract="tar_binary"
         )
+
+    def test_publishes_symlink_and_metadata(self, tmp_path: Path):
+        spec = ToolSpec(bin="rg", type="github_release", repo="BurntSushi/ripgrep")
+        plan = InstallPlan(
+            spec=spec,
+            version="v14.1.0",
+            url="https://example.com/rg.tar.gz",
+            extract="tar_binary",
+        )
+        bin_dir = tmp_path / "bin"
+        tools_dir = tmp_path / "tools"
+        current = tools_dir / "rg" / "current"
+        current.mkdir(parents=True)
+        (current / "rg").write_text("rg", encoding="utf-8")
+
+        with (
+            patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("ptm.installer._dispatch_extract"),
+        ):
+            _install_release_plan(plan, MagicMock())
+
+        link = bin_dir / "rg"
+        assert link.is_symlink()
+        assert link.resolve() == (current / "rg").resolve()
+        assert (tools_dir / "rg" / ".ptm.json").exists()
+
+    def test_does_not_replace_existing_link_when_target_is_missing(
+        self, tmp_path: Path
+    ):
+        spec = ToolSpec(
+            bin="nvim",
+            type="github_release",
+            repo="neovim/neovim",
+            bin_path_in_archive="bin/nvim",
+        )
+        plan = InstallPlan(
+            spec=spec,
+            version="nightly",
+            url="https://example.com/nvim.tar.gz",
+            extract="tar",
+        )
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        old_target = tmp_path / "old" / "nvim"
+        old_target.parent.mkdir()
+        old_target.write_text("old", encoding="utf-8")
+        link = bin_dir / "nvim"
+        link.symlink_to(old_target)
+
+        tools_dir = tmp_path / "tools"
+        current = tools_dir / "nvim" / "current"
+        current.mkdir(parents=True)
+
+        with (
+            patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("ptm.installer._dispatch_extract"),
+            pytest.raises(FileNotFoundError, match="bin/nvim"),
+        ):
+            _install_release_plan(plan, MagicMock())
+
+        assert link.is_symlink()
+        assert link.resolve() == old_target.resolve()
+        assert not (tools_dir / "nvim" / ".ptm.json").exists()

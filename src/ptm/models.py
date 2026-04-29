@@ -14,7 +14,6 @@ class ToolSpec:
     # binary release 共通 (github_release / url_release)
     platforms: dict[str, str] = field(default_factory=dict)
     extract: str = ""
-    opt_dir: str = ""
     bin_path_in_archive: str = ""
     strip_components: int = 1
     extra_bins: list[str] = field(default_factory=list)
@@ -45,12 +44,15 @@ class ToolSpec:
             return "raw_binary"
         filename = next(iter(self.platforms.values()))
         if filename.endswith((".tar.gz", ".tar.xz")):
-            return "tar" if self.opt_dir else "tar_binary"
+            return "tar" if self._needs_full_archive_extract() else "tar_binary"
         if filename.endswith(".gz"):
             return "gz_binary"
         if filename.endswith(".zip"):
             return "zip_binary"
         return "raw_binary"
+
+    def _needs_full_archive_extract(self) -> bool:
+        return bool(self.bin_path_in_archive or self.extra_bins)
 
     @classmethod
     def from_dict(cls, d: dict) -> "ToolSpec":
