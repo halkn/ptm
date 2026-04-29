@@ -18,12 +18,12 @@ ptm [--config PATH] <command> [tool]
 
 ### Commands
 
-| Command | Description |
-| --- | --- |
+| Command              | Description                                              |
+| -------------------- | -------------------------------------------------------- |
 | `ptm install [tool]` | Install tools, skipping tools that are already installed |
-| `ptm update [tool]` | Update tools to the latest version |
-| `ptm list` | List managed tools and their current versions |
-| `ptm check` | Compare installed versions with the latest versions |
+| `ptm update [tool]`  | Update tools to the latest version                       |
+| `ptm list`           | List managed tools and their current versions            |
+| `ptm check`          | Compare installed versions with the latest versions      |
 
 If `[tool]` is omitted, the command runs for all configured tools.
 
@@ -43,8 +43,8 @@ ptm check
 
 ### Options
 
-| Option | Description |
-| --- | --- |
+| Option          | Description                                                           |
+| --------------- | --------------------------------------------------------------------- |
 | `--config PATH` | Specify the config file path. Defaults to `~/.config/ptm/config.toml` |
 
 ```bash
@@ -53,9 +53,9 @@ ptm --config ~/dotfiles/config.toml install
 
 ### Environment Variables
 
-| Variable | Description |
-| --- | --- |
-| `PTM_CONFIG` | Override the default config file path |
+| Variable       | Description                                                       |
+| -------------- | ----------------------------------------------------------------- |
+| `PTM_CONFIG`   | Override the default config file path                             |
 | `XDG_BIN_HOME` | Set the binary installation directory. Defaults to `~/.local/bin` |
 
 When fetching GitHub Releases, `ptm` prefers the `gh` command. If you have already run `gh auth login`, `ptm` uses those credentials and fetches release information through `gh api`. If `gh` is not installed or is not authenticated, `ptm` falls back to the GitHub REST API.
@@ -85,18 +85,18 @@ darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 
 ### `type = "github_release"` - Install from GitHub Releases
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `bin` | yes | Binary name |
-| `repo` | yes | GitHub repository in `owner/repo` format |
-| `platforms` | yes | Mapping of platform keys to asset file names |
-| `version` | | Version to install. Defaults to `latest`; `nightly` is also supported |
-| `version_regex` | | Regular expression used to extract the version string |
-| `version_cmd` | | Version check command. Defaults to `[bin, "--version"]` |
-| `opt_dir` | | Directory where the full archive is extracted. Tar archives only |
-| `bin_path_in_archive` | | Binary path inside the archive when `opt_dir` is set |
-| `strip_components` | | Number of leading path components to strip when extracting tar archives. Defaults to `1` |
-| `extra_bins` | | Additional binary names to symlink |
+| Field                 | Required | Description                                                                              |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `bin`                 | yes      | Binary name                                                                              |
+| `repo`                | yes      | GitHub repository in `owner/repo` format                                                 |
+| `platforms`           | yes      | Mapping of platform keys to asset file names                                             |
+| `version`             |          | Version to install. Defaults to `latest`; `nightly` is also supported                    |
+| `version_regex`       |          | Regular expression used to extract the version string                                    |
+| `version_cmd`         |          | Version check command. Defaults to `[bin, "--version"]`                                  |
+| `opt_dir`             |          | Directory where the full archive is extracted. Tar archives only                         |
+| `bin_path_in_archive` |          | Binary path inside the archive when `opt_dir` is set                                     |
+| `strip_components`    |          | Number of leading path components to strip when extracting tar archives. Defaults to `1` |
+| `extra_bins`          |          | Additional binary names to symlink                                                       |
 
 **Platform keys:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
 
@@ -146,10 +146,10 @@ darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64
 
 In addition to the fields shared with `github_release`, these fields are available.
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `version_url` | | URL used to fetch the latest version |
-| `version_url_regex` | | Regular expression used to extract the version from the `version_url` response |
+| Field               | Required | Description                                                                    |
+| ------------------- | -------- | ------------------------------------------------------------------------------ |
+| `version_url`       |          | URL used to fetch the latest version                                           |
+| `version_url_regex` |          | Regular expression used to extract the version from the `version_url` response |
 
 Values in `platforms` must be **full URLs**, not asset file names.
 
@@ -171,14 +171,14 @@ version_url_regex = '"version":"([\d.]+)"'
 version_regex = 'uv ([\d.]+)'
 ```
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `bin` | yes | Binary name |
-| `url` | | Installation script URL, executed as `curl \| sh` |
-| `command` | | Shell command to run during installation |
-| `update_command` | | Command to run during updates. Uses `command` when omitted |
-| `version_url` | | URL used by `ptm check` and `ptm update` to fetch the latest version |
-| `version_url_regex` | | Regular expression used to extract the latest version from the `version_url` response |
+| Field               | Required | Description                                                                           |
+| ------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `bin`               | yes      | Binary name                                                                           |
+| `url`               |          | Installation script URL, executed as `curl \| sh`                                     |
+| `command`           |          | Shell command to run during installation                                              |
+| `update_command`    |          | Command to run during updates. Uses `command` when omitted                            |
+| `version_url`       |          | URL used by `ptm check` and `ptm update` to fetch the latest version                  |
+| `version_url_regex` |          | Regular expression used to extract the latest version from the `version_url` response |
 
 Specify either `url` or `command`.
 
@@ -205,12 +205,12 @@ version_regex = 'Version ([\d.]+)'
 type = "bun"
 ```
 
-| Field | Required | Description |
-| --- | --- | --- |
-| `bin` | yes | Binary name |
-| `package` | | npm / Bun package name. Defaults to `bin` |
-| `version_cmd` | | Version check command. Defaults to `[bin, "--version"]` |
-| `version_regex` | | Regular expression used to extract the version string |
+| Field           | Required | Description                                             |
+| --------------- | -------- | ------------------------------------------------------- |
+| `bin`           | yes      | Binary name                                             |
+| `package`       |          | npm / Bun package name. Defaults to `bin`               |
+| `version_cmd`   |          | Version check command. Defaults to `[bin, "--version"]` |
+| `version_regex` |          | Regular expression used to extract the version string   |
 
 `type = "npm"` runs `npm install -g <package>` / `npm update -g <package>`.
 `type = "bun"` runs `bun install -g <package>` / `bun update -g <package>`.
