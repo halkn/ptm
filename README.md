@@ -2,73 +2,73 @@
 
 [![CI](https://github.com/halkn/ptm/actions/workflows/ci.yml/badge.svg)](https://github.com/halkn/ptm/actions/workflows/ci.yml)
 
-GitHub Releases や公式インストーラー経由で CLI ツールをインストール・管理するツールマネージャー。
+A tool manager for installing and managing CLI tools from GitHub Releases, official installers, npm, Bun, and direct release URLs.
 
-## インストール
+## Installation
 
 ```bash
 uv tool install git+https://github.com/halkn/ptm
 ```
 
-## 使い方
+## Usage
 
 ```text
 ptm [--config PATH] <command> [tool]
 ```
 
-### コマンド
+### Commands
 
-| コマンド | 説明 |
-| --- | --- |
-| `ptm install [tool]` | ツールをインストール（インストール済みはスキップ） |
-| `ptm update [tool]` | ツールを最新バージョンに更新 |
-| `ptm list` | 管理対象ツールと現在のバージョンを一覧表示 |
-| `ptm check` | インストール済みバージョンと最新バージョンを比較 |
+| Command              | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `ptm install [tool]` | Install tools, skipping tools that are already installed |
+| `ptm update [tool]`  | Update tools to the latest version                       |
+| `ptm list`           | List managed tools and their current versions            |
+| `ptm check`          | Compare installed versions with the latest versions      |
 
-`[tool]` を省略すると全ツールが対象になります。
+If `[tool]` is omitted, the command runs for all configured tools.
 
 ```bash
-# 全ツールをインストール
+# Install all tools
 ptm install
 
-# 特定ツールのみインストール
+# Install one tool
 ptm install rg
 
-# 全ツールを更新
+# Update all tools
 ptm update
 
-# バージョン確認
+# Check versions
 ptm check
 ```
 
-### オプション
+### Options
 
-| オプション | 説明 |
-| --- | --- |
-| `--config PATH` | 設定ファイルのパスを指定（デフォルト: `~/.config/ptm/config.toml`） |
+| Option          | Description                                                           |
+| --------------- | --------------------------------------------------------------------- |
+| `--config PATH` | Specify the config file path. Defaults to `~/.config/ptm/config.toml` |
 
 ```bash
 ptm --config ~/dotfiles/config.toml install
 ```
 
-### 環境変数
+### Environment Variables
 
-| 変数名 | 説明 |
-| --- | --- |
-| `PTM_CONFIG` | 設定ファイルのデフォルトパスを変更 |
-| `XDG_BIN_HOME` | バイナリのインストール先（デフォルト: `~/.local/bin`） |
+| Variable       | Description                                                       |
+| -------------- | ----------------------------------------------------------------- |
+| `PTM_CONFIG`   | Override the default config file path                             |
+| `XDG_BIN_HOME` | Set the binary installation directory. Defaults to `~/.local/bin` |
 
-GitHub Releases の取得では `gh` コマンドを優先します。`gh auth login` 済みであれば、その認証情報を使って `gh api` 経由で release 情報を取得します。`gh` が未インストール、または未ログインの場合は GitHub REST API へフォールバックします。
+When fetching GitHub Releases, `ptm` prefers the `gh` command. If you have already run `gh auth login`, `ptm` uses those credentials and fetches release information through `gh api`. If `gh` is not installed or is not authenticated, `ptm` falls back to the GitHub REST API.
 
-## 設定ファイル
+## Configuration
 
-`~/.config/ptm/config.toml` に管理するツールを定義します。
+Define managed tools in `~/.config/ptm/config.toml`.
 
-ツールは4種類の方法で管理できます。
+Tools can be managed in four ways.
 
 ---
 
-### `[tools.<name>]` — ツール単位で定義
+### `[tools.<name>]` - Define a Tool
 
 ```toml
 [tools.rg]
@@ -81,31 +81,31 @@ linux-x86_64 = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz"
 darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
 ```
 
-`<name>` は論理名です。`bin` を省略した場合は `<name>` が使われます。
+`<name>` is the logical tool name. If `bin` is omitted, `<name>` is used as the binary name.
 
-### `type = "github_release"` — GitHub Releases からインストール
+### `type = "github_release"` - Install from GitHub Releases
 
-| フィールド | 必須 | 説明 |
-| --- | --- | --- |
-| `bin` | ✓ | バイナリ名 |
-| `repo` | ✓ | `owner/repo` 形式の GitHub リポジトリ |
-| `platforms` | ✓ | プラットフォームとアセットファイル名のマッピング |
-| `version` | | バージョン指定（デフォルト: `latest`、`nightly` も可） |
-| `version_regex` | | バージョン文字列を抽出する正規表現 |
-| `version_cmd` | | バージョン確認コマンド（デフォルト: `[bin, "--version"]`） |
-| `opt_dir` | | アーカイブ全体を展開するディレクトリ（tar のみ） |
-| `bin_path_in_archive` | | `opt_dir` 指定時のアーカイブ内バイナリパス |
-| `strip_components` | | tar 展開時に除去するパス要素数（デフォルト: `1`） |
-| `extra_bins` | | 追加でシンボリックリンクを作成するバイナリ名 |
+| Field                 | Required | Description                                                                              |
+| --------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `bin`                 | yes      | Binary name                                                                              |
+| `repo`                | yes      | GitHub repository in `owner/repo` format                                                 |
+| `platforms`           | yes      | Mapping of platform keys to asset file names                                             |
+| `version`             |          | Version to install. Defaults to `latest`; `nightly` is also supported                    |
+| `version_regex`       |          | Regular expression used to extract the version string                                    |
+| `version_cmd`         |          | Version check command. Defaults to `[bin, "--version"]`                                  |
+| `opt_dir`             |          | Directory where the full archive is extracted. Tar archives only                         |
+| `bin_path_in_archive` |          | Binary path inside the archive when `opt_dir` is set                                     |
+| `strip_components`    |          | Number of leading path components to strip when extracting tar archives. Defaults to `1` |
+| `extra_bins`          |          | Additional binary names to symlink                                                       |
 
-**プラットフォームキー:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
+**Platform keys:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
 
-**テンプレート変数:**
+**Template variables:**
 
-- `{tag}` — タグ名（例: `v1.2.3`）
-- `{version}` — `v` を除いたバージョン（例: `1.2.3`）
+- `{tag}` - Tag name, for example `v1.2.3`
+- `{version}` - Version without the leading `v`, for example `1.2.3`
 
-**アーカイブ全体を展開する場合（`opt_dir` 指定）:**
+**Extracting a full archive with `opt_dir`:**
 
 ```toml
 [tools.nvim]
@@ -123,9 +123,9 @@ darwin-arm64 = "nvim-macos-arm64.tar.gz"
 
 ---
 
-### `type = "url_release"` — 任意の URL からインストール
+### `type = "url_release"` - Install from Any URL
 
-GitHub 以外のホスティングサービス（Node.js 公式など）に使用します。
+Use this for hosting services other than GitHub, such as official Node.js releases.
 
 ```toml
 [tools.node]
@@ -144,22 +144,22 @@ linux-x86_64 = "https://nodejs.org/dist/v{version}/node-v{version}-linux-x64.tar
 darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64.tar.xz"
 ```
 
-`github_release` と共通のフィールドに加え、以下が使えます。
+In addition to the fields shared with `github_release`, these fields are available.
 
-| フィールド | 必須 | 説明 |
-| --- | --- | --- |
-| `version_url` | | 最新バージョンを取得する URL |
-| `version_url_regex` | | `version_url` のレスポンスからバージョンを抽出する正規表現 |
+| Field               | Required | Description                                                                    |
+| ------------------- | -------- | ------------------------------------------------------------------------------ |
+| `version_url`       |          | URL used to fetch the latest version                                           |
+| `version_url_regex` |          | Regular expression used to extract the version from the `version_url` response |
 
-`platforms` の値はアセットファイル名ではなく **完全な URL** を指定します。
+Values in `platforms` must be **full URLs**, not asset file names.
 
-`platforms` を省略する場合、現状は Node.js の `https://nodejs.org/dist/index.json` を使う `node` 設定のみ自動解決に対応しています。それ以外の `url_release` は明示 `platforms` が必要です。
+If `platforms` is omitted, automatic resolution currently supports only the `node` configuration that uses `https://nodejs.org/dist/index.json`. Other `url_release` tools require explicit `platforms`.
 
 ---
 
-### `type = "installer"` — カスタムインストーラー
+### `type = "installer"` - Custom Installer
 
-公式インストールスクリプトを使う場合などに使用します。
+Use this for official installation scripts and similar installers.
 
 ```toml
 [tools.uv]
@@ -171,24 +171,24 @@ version_url_regex = '"version":"([\d.]+)"'
 version_regex = 'uv ([\d.]+)'
 ```
 
-| フィールド | 必須 | 説明 |
-| --- | --- | --- |
-| `bin` | ✓ | バイナリ名 |
-| `url` | | インストールスクリプトの URL（`curl \| sh` で実行） |
-| `command` | | インストール時に実行するシェルコマンド |
-| `update_command` | | 更新時に実行するコマンド（省略時は `command` を使用） |
-| `version_url` | | `ptm check` / `ptm update` 用の最新版取得 URL |
-| `version_url_regex` | | `version_url` のレスポンスから最新版を抽出する正規表現 |
+| Field               | Required | Description                                                                           |
+| ------------------- | -------- | ------------------------------------------------------------------------------------- |
+| `bin`               | yes      | Binary name                                                                           |
+| `url`               |          | Installation script URL, executed as `curl \| sh`                                     |
+| `command`           |          | Shell command to run during installation                                              |
+| `update_command`    |          | Command to run during updates. Uses `command` when omitted                            |
+| `version_url`       |          | URL used by `ptm check` and `ptm update` to fetch the latest version                  |
+| `version_url_regex` |          | Regular expression used to extract the latest version from the `version_url` response |
 
-`url` と `command` はいずれか一方を指定します。
+Specify either `url` or `command`.
 
-`version_url` を設定した `installer` は、`url_release` と同様に最新版比較の対象になります。`uv` のように公式インストーラーで導入しつつ、公開 API や JSON から最新バージョンを取得できるツール向けです。
+An `installer` with `version_url` is included in latest-version comparisons, just like `url_release`. This is useful for tools such as `uv`, where the official installer performs installation but a public API or JSON endpoint can provide the latest version.
 
 ---
 
-### `type = "npm"` / `type = "bun"` — npm / Bun グローバルパッケージ
+### `type = "npm"` / `type = "bun"` - npm / Bun Global Packages
 
-npm または Bun のグローバルパッケージとして管理したいツールに使用します。
+Use this for tools managed as global npm or Bun packages.
 
 ```toml
 [tools.markdownlint-cli2]
@@ -205,36 +205,36 @@ version_regex = 'Version ([\d.]+)'
 type = "bun"
 ```
 
-| フィールド | 必須 | 説明 |
-| --- | --- | --- |
-| `bin` | ✓ | バイナリ名 |
-| `package` | | npm / Bun パッケージ名（省略時は `bin` を使用） |
-| `version_cmd` | | バージョン確認コマンド（デフォルト: `[bin, "--version"]`） |
-| `version_regex` | | バージョン文字列を抽出する正規表現 |
+| Field           | Required | Description                                             |
+| --------------- | -------- | ------------------------------------------------------- |
+| `bin`           | yes      | Binary name                                             |
+| `package`       |          | npm / Bun package name. Defaults to `bin`               |
+| `version_cmd`   |          | Version check command. Defaults to `[bin, "--version"]` |
+| `version_regex` |          | Regular expression used to extract the version string   |
 
-`type = "npm"` では `npm install -g <package>` / `npm update -g <package>` を実行します。
-`type = "bun"` では `bun install -g <package>` / `bun update -g <package>` を実行します。
-どちらも npm registry の metadata API を使って最新版と比較します。
+`type = "npm"` runs `npm install -g <package>` / `npm update -g <package>`.
+`type = "bun"` runs `bun install -g <package>` / `bun update -g <package>`.
+Both compare against the latest version through the npm registry metadata API.
 
 ---
 
-## 開発
+## Development
 
-GitHub Actions では `push` / `pull_request` 時に `ruff`、`ty`、`pytest` を実行します。
+GitHub Actions runs `ruff`, `ty`, and `pytest` on `push` and `pull_request`.
 
 ```bash
-# 依存関係のインストール
+# Install dependencies
 uv sync
 
-# テスト
+# Run tests
 uv run pytest
 
 # Lint
 uv run ruff check src tests
 
-# フォーマット
+# Format
 uv run ruff format src tests
 
-# 型チェック
+# Type check
 uv run ty check src tests
 ```
