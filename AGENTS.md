@@ -1,26 +1,32 @@
 # Repository Guidelines
 
-## プロジェクト構成
-アプリケーション本体は `src/ptm/` 配下にあります。CLI の起点は `main.py`、コマンド実行は `commands.py`、インストール・更新処理は `installer.py`、設定読み込みは `config.py`、共通モデルや解決処理は `models.py` と `resolver.py` に配置します。テストは `tests/` にあり、`tests/test_installer.py` のように対象モジュールに対応させます。ルートには `pyproject.toml`、`README.md`、`uv.lock` があります。
+## Project Structure
 
-## ビルド・テスト・開発コマンド
-ローカル開発では `uv` を使います。
+The application code lives under `src/ptm/`. The CLI entry point is `main.py`, command execution is handled in `commands.py`, installation and update logic lives in `installer.py`, configuration loading is in `config.py`, and shared models and resolution logic live in `models.py` and `resolver.py`. Tests live under `tests/` and should correspond to the target module, such as `tests/test_installer.py`. The repository root contains `pyproject.toml`, `README.md`, and `uv.lock`.
 
-- `uv sync`: 実行時依存と開発依存をセットアップします。
-- `uv run pytest`: カバレッジ付きでテストを実行します。
-- `uv run ruff check src tests`: Lint と import 順序を検査します。
-- `uv run ruff format src tests`: コードを整形します。
-- `uv run ty check src tests`: 型チェックを実行します。
-- `uv run ptm list`: CLI の簡易動作確認を行います。
+## Build, Test, and Development Commands
 
-## コーディング規約
-Python `>=3.11` を前提とし、公開関数には型ヒントを付けます。インデントは 4 スペース、文字列はダブルクォートを基本とし、`ruff format` の結果に従ってください。関数・変数・モジュールは `snake_case`、クラスは `PascalCase`、定数は `UPPER_SNAKE_CASE` を使います。CLI 向けの分岐は `commands.py` に寄せ、`main.py` には起動処理以上の責務を持たせないでください。
+Use `uv` for local development.
 
-## テスト方針
-テストフレームワークは `pytest` です。ファイル名は `test_<module>.py`、テスト関数名は `test_<behavior>()` を基本にします。新機能や仕様変更では、対応する `tests/test_*.py` を追加または更新してください。`pyproject.toml` でカバレッジ計測が有効なので、特に installer、config、command dispatch 周りの網羅性を維持してください。
+- `uv sync`: Set up runtime and development dependencies.
+- `uv run pytest`: Run tests with coverage enabled.
+- `uv run ruff check src tests`: Check linting and import order.
+- `uv run ruff format src tests`: Format code.
+- `uv run ty check src tests`: Run type checking.
+- `uv run ptm list`: Run a quick CLI smoke test.
 
-## コミットと Pull Request
-最近の履歴では `docs:`、`test:`、`chore:`、`refactor:` のような短い接頭辞を使っています。コミットメッセージは命令形で簡潔にし、例として `fix: handle missing release asset` のように書きます。Pull Request には変更概要、実施した確認内容（例: `uv run pytest`、`uv run ruff check src tests`）、関連 Issue があればその参照を含めてください。CLI の出力や設定ファイルの挙動が変わる場合は、影響が分かる例も添えてください。
+## Coding Style
 
-## セキュリティと設定
-トークン、ローカル設定、認証情報はコミットしないでください。`PTM_CONFIG`、`XDG_BIN_HOME`、`GITHUB_TOKEN` は実行時入力として扱い、コードへ埋め込まないでください。ドキュメントやサンプルでは実在値ではなくプレースホルダーを使います。
+Target Python `>=3.11`, and add type hints to public functions. Use 4-space indentation, prefer double quotes for strings, and follow the output of `ruff format`. Use `snake_case` for functions, variables, and modules; `PascalCase` for classes; and `UPPER_SNAKE_CASE` for constants. Keep CLI-specific branching in `commands.py`, and keep `main.py` limited to startup concerns.
+
+## Testing Guidelines
+
+The test framework is `pytest`. Test files should be named `test_<module>.py`, and test functions should generally be named `test_<behavior>()`. For new features or behavior changes, add or update the corresponding `tests/test_*.py` file. Coverage is enabled in `pyproject.toml`, so maintain good coverage especially around installer, config, and command dispatch behavior.
+
+## Commits and Pull Requests
+
+Recent history uses short prefixes such as `docs:`, `test:`, `chore:`, and `refactor:`. Write commit messages in the imperative mood and keep them concise, for example `fix: handle missing release asset`. Pull requests should include a change summary, verification performed such as `uv run pytest` or `uv run ruff check src tests`, and related issue references when applicable. If CLI output or configuration behavior changes, include examples that make the impact clear.
+
+## Security and Configuration
+
+Do not commit tokens, local settings, or credentials. Treat `PTM_CONFIG`, `XDG_BIN_HOME`, and `GITHUB_TOKEN` as runtime inputs, and do not embed them in code. Use placeholders instead of real values in documentation and examples.
