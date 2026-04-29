@@ -10,6 +10,29 @@ A tool manager for installing and managing CLI tools from GitHub Releases, offic
 uv tool install git+https://github.com/halkn/ptm
 ```
 
+## Development
+
+Use `uv` for dependency management and `just` for common development tasks.
+Install `just` separately if it is not already available.
+
+```bash
+just setup
+just check
+```
+
+Available tasks:
+
+| Task                | Description                                  |
+| ------------------- | -------------------------------------------- |
+| `just setup`        | Set up runtime and development dependencies  |
+| `just check`        | Run all local checks                         |
+| `just lint`         | Check linting and import order               |
+| `just format`       | Format source and test files                 |
+| `just format-check` | Check formatting without modifying files     |
+| `just typecheck`    | Run type checks                              |
+| `just test`         | Run tests with coverage enabled              |
+| `just smoke`        | Run a quick CLI smoke test                   |
+
 ## Usage
 
 ```text

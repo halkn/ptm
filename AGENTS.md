@@ -6,14 +6,20 @@ The application code lives under `src/ptm/`. The CLI entry point is `main.py`, c
 
 ## Build, Test, and Development Commands
 
-Use `uv` for local development.
+Use `uv` for dependency management and `just` for common development tasks.
 
-- `uv sync`: Set up runtime and development dependencies.
-- `uv run pytest`: Run tests with coverage enabled.
-- `uv run ruff check src tests`: Check linting and import order.
-- `uv run ruff format src tests`: Format code.
-- `uv run ty check src tests`: Run type checking.
-- `uv run ptm list`: Run a quick CLI smoke test.
+- `just setup`: Set up runtime and development dependencies.
+- `just check`: Run linting, format checks, type checks, and tests.
+- `just lint`: Check linting and import order.
+- `just format`: Format source and test files.
+- `just format-check`: Check formatting without modifying files.
+- `just typecheck`: Run type checking.
+- `just test`: Run tests with coverage enabled.
+- `just smoke`: Run a quick CLI smoke test.
+
+The underlying commands remain available when needed: `uv sync`, `uv run pytest`,
+`uv run ruff check src tests`, `uv run ruff format src tests`,
+`uv run ty check src tests`, and `uv run ptm list`.
 
 ## Coding Style
 
