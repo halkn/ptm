@@ -8,10 +8,8 @@ from ptm.package_managers import (
 
 
 def test_npm_registry_package_managers_define_commands() -> None:
-    assert NPM_REGISTRY_PACKAGE_MANAGERS["npm"].install_command == "install"
-    assert NPM_REGISTRY_PACKAGE_MANAGERS["npm"].update_command == "update"
-    assert NPM_REGISTRY_PACKAGE_MANAGERS["bun"].install_command == "install"
-    assert NPM_REGISTRY_PACKAGE_MANAGERS["bun"].update_command == "update"
+    assert NPM_REGISTRY_PACKAGE_MANAGERS["npm"].executable == "npm"
+    assert NPM_REGISTRY_PACKAGE_MANAGERS["bun"].executable == "bun"
 
 
 @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)

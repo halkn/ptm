@@ -94,6 +94,8 @@ def resolve_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
             return None
         return get_url_release_version(spec, client)
     if is_npm_registry_package_type(spec.type):
+        if spec.version != "latest":
+            return spec.version
         return _get_package_registry_latest_version(spec, client)
     if spec.type == "url_release":
         return get_url_release_version(spec, client)

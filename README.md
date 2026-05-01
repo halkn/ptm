@@ -93,7 +93,7 @@ When fetching GitHub Releases, `ptm` prefers the `gh` command. If you have alrea
 
 ## Managed Files and Cleaning
 
-For `github_release` and `url_release` tools, `ptm` stores the actual installed files under:
+For `github_release`, `url_release`, `npm`, and `bun` tools, `ptm` stores the actual installed files under:
 
 ```text
 ${XDG_DATA_HOME:-~/.local/share}/ptm/tools/<bin>/current
@@ -101,9 +101,9 @@ ${XDG_DATA_HOME:-~/.local/share}/ptm/tools/<bin>/current
 
 `$XDG_BIN_HOME` contains symlinks to those managed files. This keeps `ptm` from deleting commands that were installed by other tools into the same bin directory.
 
-`ptm clean` compares the managed tool directories with the current config and shows release tools that are no longer configured. It is a dry-run by default; pass `--apply` to remove the managed tool directory and only the symlinks that point into it.
+`ptm clean` compares the managed tool directories with the current config and shows tools that are no longer configured. It is a dry-run by default; pass `--apply` to remove the managed tool directory and only the symlinks that point into it.
 
-Tools installed before this managed-root layout are not adopted automatically. `installer`, `npm`, and `bun` tools are not cleaned in this version because their install locations are controlled outside `ptm`.
+Tools installed before this managed-root layout are not adopted automatically. `installer` tools are not cleaned because their install locations are controlled outside `ptm`.
 
 ## Configuration
 
@@ -228,9 +228,9 @@ An `installer` with `version_url` is included in latest-version comparisons, jus
 
 ---
 
-### `type = "npm"` / `type = "bun"` - npm / Bun Global Packages
+### `type = "npm"` / `type = "bun"` - npm / Bun Packages
 
-Use this for tools managed as global npm or Bun packages.
+Use this for tools distributed as npm or Bun packages. `ptm` installs each package into its own managed directory and links binaries into `$XDG_BIN_HOME`; it does not use your npm or Bun global package directory.
 
 ```toml
 [tools.markdownlint-cli2]
@@ -247,16 +247,18 @@ version_regex = 'Version ([\d.]+)'
 type = "bun"
 ```
 
-| Field           | Required | Description                                             |
-| --------------- | -------- | ------------------------------------------------------- |
-| `bin`           | yes      | Binary name                                             |
-| `package`       |          | npm / Bun package name. Defaults to `bin`               |
-| `version_cmd`   |          | Version check command. Defaults to `[bin, "--version"]` |
-| `version_regex` |          | Regular expression used to extract the version string   |
+| Field           | Required | Description                                                 |
+| --------------- | -------- | ----------------------------------------------------------- |
+| `bin`           | yes      | Binary name                                                 |
+| `package`       |          | npm / Bun package name. Defaults to `bin`                   |
+| `version`       |          | Package version to install. Defaults to `latest`            |
+| `version_cmd`   |          | Version check command. Defaults to `[bin, "--version"]`     |
+| `version_regex` |          | Regular expression used to extract the version string       |
+| `extra_bins`    |          | Additional binary names to symlink from `node_modules/.bin` |
 
-`type = "npm"` runs `npm install -g <package>` / `npm update -g <package>`.
-`type = "bun"` runs `bun install -g <package>` / `bun update -g <package>`.
-Both compare against the latest version through the npm registry metadata API.
+`type = "npm"` creates an isolated package project under the managed tool directory and runs `npm install --prefix <tool-dir>`.
+`type = "bun"` creates an isolated package project under the managed tool directory and runs `bun install --cwd <tool-dir>`.
+When `version = "latest"` is used, both compare against the latest version through the npm registry metadata API. Fixed versions are installed and compared as pinned versions.
 
 ---
 

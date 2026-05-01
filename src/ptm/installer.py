@@ -1,5 +1,6 @@
 import copy
 import gzip
+import json
 import shlex
 import shutil
 import stat
@@ -74,6 +75,35 @@ def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
     for link, target in link_targets:
         link.symlink_to(target)
     return [link for link, _target in link_targets]
+
+
+def _publish_package_manager_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
+    BIN_DIR.mkdir(parents=True, exist_ok=True)
+    package_bin_dir = current_dir / "node_modules" / ".bin"
+    link_targets = [(BIN_DIR / spec.bin, package_bin_dir / spec.bin)]
+    link_targets.extend(
+        (BIN_DIR / extra, package_bin_dir / extra) for extra in spec.extra_bins
+    )
+
+    for _link, target in link_targets:
+        if not target.exists():
+            raise FileNotFoundError(f"{target} not found")
+
+    for link, _target in link_targets:
+        link.unlink(missing_ok=True)
+
+    for link, target in link_targets:
+        link.symlink_to(target)
+    return [link for link, _target in link_targets]
+
+
+def _validate_package_manager_links(spec: ToolSpec, staging_dir: Path) -> None:
+    package_bin_dir = staging_dir / "node_modules" / ".bin"
+    targets = [package_bin_dir / spec.bin]
+    targets.extend(package_bin_dir / extra for extra in spec.extra_bins)
+    for target in targets:
+        if not target.exists():
+            raise FileNotFoundError(f"{target} not found")
 
 
 def _download(url: str, dest: Path, client: httpx.Client) -> None:
@@ -240,16 +270,47 @@ def _run_installer(spec: ToolSpec, update: bool = False) -> None:
         )
 
 
-def _run_package_manager_install(
-    spec: ToolSpec, manager: str, update: bool = False
-) -> None:
-    package_manager = get_package_manager(manager)
-    action = (
-        package_manager.update_command if update else package_manager.install_command
+def _write_package_project(spec: ToolSpec, staging_dir: Path) -> None:
+    version = spec.version if spec.version != "latest" else "latest"
+    package_json = {
+        "private": True,
+        "dependencies": {
+            spec.package: version,
+        },
+    }
+    (staging_dir / "package.json").write_text(
+        json.dumps(package_json, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
     )
-    cmd = [manager, action, "-g", spec.package]
-    console.print(f"  Running: {shlex.join(cmd)}")
-    subprocess.run(cmd, check=True)
+
+
+def _package_manager_install_command(manager: str, staging_dir: Path) -> list[str]:
+    executable = get_package_manager(manager).executable
+    match manager:
+        case "npm":
+            return [executable, "install", "--prefix", str(staging_dir)]
+        case "bun":
+            return [executable, "install", "--cwd", str(staging_dir)]
+        case _:
+            raise ValueError(f"Unknown package manager type: {manager}")
+
+
+def _install_package_manager_package(spec: ToolSpec, manager: str) -> None:
+    staging_dir = _prepare_managed_staging_dir(spec)
+    try:
+        _write_package_project(spec, staging_dir)
+        cmd = _package_manager_install_command(manager, staging_dir)
+        console.print(f"  Running: {shlex.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        _validate_package_manager_links(spec, staging_dir)
+        current_dir = _activate_managed_current_dir(spec, staging_dir)
+        links = _publish_package_manager_links(spec, current_dir)
+        tool_dir = get_tool_dir(spec.bin, PTM_TOOLS_DIR)
+        write_tool_metadata(spec, tool_dir, links)
+    except Exception:
+        if staging_dir.exists() or staging_dir.is_symlink():
+            shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
 
 
 def do_install(
@@ -269,7 +330,7 @@ def do_install(
             case "installer":
                 _run_installer(spec, update=update)
             case _ if is_npm_registry_package_type(spec.type):
-                _run_package_manager_install(spec, spec.type, update=update)
+                _install_package_manager_package(spec, spec.type)
             case _:
                 raise ValueError(f"Unknown type: {spec.type}")
         console.print(f"  [green]Done.[/green] {get_installed_version(spec) or ''}")

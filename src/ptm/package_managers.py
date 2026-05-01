@@ -3,13 +3,12 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class PackageManager:
-    install_command: str
-    update_command: str
+    executable: str
 
 
 NPM_REGISTRY_PACKAGE_MANAGERS: dict[str, PackageManager] = {
-    "npm": PackageManager(install_command="install", update_command="update"),
-    "bun": PackageManager(install_command="install", update_command="update"),
+    "npm": PackageManager(executable="npm"),
+    "bun": PackageManager(executable="bun"),
 }
 
 
