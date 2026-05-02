@@ -1,5 +1,6 @@
 import gzip
 import io
+import json
 import stat
 import tarfile
 import zipfile
@@ -13,13 +14,13 @@ from ptm.installer import (
     _dispatch_extract,
     _extract_binary_from_tar,
     _install_gz_binary,
+    _install_package_manager_package,
     _install_raw_binary,
     _install_release_plan,
     _install_tar,
     _install_tar_binary,
     _install_zip_binary,
     _run_installer,
-    _run_package_manager_install,
     _strip_components,
     do_install,
 )
@@ -316,51 +317,139 @@ class TestRunInstaller:
         assert "https://astral.sh/uv/install.sh" in args
 
 
-class TestRunPackageManagerInstall:
+class TestInstallPackageManagerPackage:
     @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
-    def test_runs_install(self, manager: str):
+    def test_installs_in_managed_tool_dir_and_publishes_link(
+        self, manager: str, tmp_path: Path
+    ):
         spec = ToolSpec(bin="markdownlint-cli2", type=manager)
-        with patch("subprocess.run") as mock_run:
-            _run_package_manager_install(spec, manager)
-        mock_run.assert_called_once_with(
-            [
-                manager,
-                NPM_REGISTRY_PACKAGE_MANAGERS[manager].install_command,
-                "-g",
-                "markdownlint-cli2",
-            ],
-            check=True,
+        bin_dir = tmp_path / "bin"
+        tools_dir = tmp_path / "tools"
+
+        def fake_run(cmd: list[str], check: bool) -> None:
+            assert check
+            next_dir = tools_dir / "markdownlint-cli2" / "next"
+            package_bin_dir = next_dir / "node_modules" / ".bin"
+            package_bin_dir.mkdir(parents=True)
+            (package_bin_dir / "markdownlint-cli2").write_text("bin", encoding="utf-8")
+
+        with (
+            patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("subprocess.run", side_effect=fake_run) as mock_run,
+        ):
+            _install_package_manager_package(spec, manager)
+
+        package_json = json.loads(
+            (tools_dir / "markdownlint-cli2" / "current" / "package.json").read_text(
+                encoding="utf-8"
+            )
         )
+        assert package_json["dependencies"] == {"markdownlint-cli2": "latest"}
+        assert (bin_dir / "markdownlint-cli2").is_symlink()
+        assert (bin_dir / "markdownlint-cli2").resolve() == (
+            tools_dir
+            / "markdownlint-cli2"
+            / "current"
+            / "node_modules"
+            / ".bin"
+            / "markdownlint-cli2"
+        ).resolve()
+        assert (tools_dir / "markdownlint-cli2" / ".ptm.json").exists()
+        command = mock_run.call_args[0][0]
+        if manager == "npm":
+            assert command == [
+                "npm",
+                "install",
+                "--prefix",
+                str(tools_dir / "markdownlint-cli2" / "next"),
+            ]
+        else:
+            assert command == [
+                "bun",
+                "install",
+                "--cwd",
+                str(tools_dir / "markdownlint-cli2" / "next"),
+            ]
 
     @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
-    def test_runs_update_when_updating(self, manager: str):
-        spec = ToolSpec(bin="markdownlint-cli2", type=manager)
-        with patch("subprocess.run") as mock_run:
-            _run_package_manager_install(spec, manager, update=True)
-        mock_run.assert_called_once_with(
-            [
-                manager,
-                NPM_REGISTRY_PACKAGE_MANAGERS[manager].update_command,
-                "-g",
-                "markdownlint-cli2",
-            ],
-            check=True,
+    def test_uses_package_name_and_version_when_set(self, manager: str, tmp_path: Path):
+        spec = ToolSpec(bin="tsc", type=manager, package="typescript", version="5.9.3")
+        tools_dir = tmp_path / "tools"
+
+        def fake_run(_cmd: list[str], check: bool) -> None:
+            assert check
+            package_bin_dir = tools_dir / "tsc" / "next" / "node_modules" / ".bin"
+            package_bin_dir.mkdir(parents=True)
+            (package_bin_dir / "tsc").write_text("bin", encoding="utf-8")
+
+        with (
+            patch("ptm.installer.BIN_DIR", tmp_path / "bin"),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("subprocess.run", side_effect=fake_run),
+        ):
+            _install_package_manager_package(spec, manager)
+
+        package_json = json.loads(
+            (tools_dir / "tsc" / "current" / "package.json").read_text(encoding="utf-8")
         )
+        assert package_json["dependencies"] == {"typescript": "5.9.3"}
 
     @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
-    def test_uses_package_name_when_set(self, manager: str):
+    def test_does_not_replace_existing_link_when_package_bin_is_missing(
+        self, manager: str, tmp_path: Path
+    ):
         spec = ToolSpec(bin="tsc", type=manager, package="typescript")
-        with patch("subprocess.run") as mock_run:
-            _run_package_manager_install(spec, manager)
-        mock_run.assert_called_once_with(
-            [
-                manager,
-                NPM_REGISTRY_PACKAGE_MANAGERS[manager].install_command,
-                "-g",
-                "typescript",
-            ],
-            check=True,
-        )
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        old_target = tmp_path / "old" / "tsc"
+        old_target.parent.mkdir()
+        old_target.write_text("old", encoding="utf-8")
+        link = bin_dir / "tsc"
+        link.symlink_to(old_target)
+
+        tools_dir = tmp_path / "tools"
+
+        with (
+            patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("subprocess.run"),
+            pytest.raises(FileNotFoundError, match=r"node_modules/\.bin/tsc"),
+        ):
+            _install_package_manager_package(spec, manager)
+
+        assert link.is_symlink()
+        assert link.resolve() == old_target.resolve()
+        assert not (tools_dir / "tsc" / ".ptm.json").exists()
+
+    @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_restores_current_dir_when_package_link_publish_fails(
+        self, manager: str, tmp_path: Path
+    ):
+        spec = ToolSpec(bin="tsc", type=manager, package="typescript")
+        bin_dir = tmp_path / "bin"
+        tools_dir = tmp_path / "tools"
+        current = tools_dir / "tsc" / "current"
+        old_bin = current / "node_modules" / ".bin" / "tsc"
+        old_bin.parent.mkdir(parents=True)
+        old_bin.write_text("old", encoding="utf-8")
+
+        def fake_run(_cmd: list[str], check: bool) -> None:
+            assert check
+            package_bin_dir = tools_dir / "tsc" / "next" / "node_modules" / ".bin"
+            package_bin_dir.mkdir(parents=True)
+
+        with (
+            patch("ptm.installer.BIN_DIR", bin_dir),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("subprocess.run", side_effect=fake_run),
+            pytest.raises(FileNotFoundError, match=r"node_modules/\.bin/tsc"),
+        ):
+            _install_package_manager_package(spec, manager)
+
+        assert old_bin.exists()
+        assert old_bin.read_text(encoding="utf-8") == "old"
+        assert not (tools_dir / "tsc" / "previous").exists()
 
 
 # ---- _dispatch_extract ------------------------------------------------------
@@ -486,11 +575,11 @@ class TestDoInstall:
         spec = ToolSpec(bin="markdownlint-cli2", type=tool_type)
         client = MagicMock()
         with (
-            patch("ptm.installer._run_package_manager_install") as mock_run,
+            patch("ptm.installer._install_package_manager_package") as mock_run,
             patch("ptm.installer.get_installed_version", return_value="0.15.0"),
         ):
             do_install(spec, client)
-        mock_run.assert_called_once_with(spec, tool_type, update=False)
+        mock_run.assert_called_once_with(spec, tool_type)
 
     def test_prints_error_on_failure(self, capsys: pytest.CaptureFixture):
         spec = ToolSpec(bin="rg", type="github_release")

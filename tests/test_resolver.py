@@ -258,6 +258,16 @@ class TestGetComparableLatestVersion:
         ):
             assert get_comparable_latest_version(spec, client) == "0.15.0"
 
+    @pytest.mark.parametrize("tool_type", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_uses_pinned_npm_registry_package_version(self, tool_type: str):
+        spec = ToolSpec(
+            bin="tsc", type=tool_type, package="typescript", version="5.9.3"
+        )
+        client = MagicMock()
+
+        assert get_comparable_latest_version(spec, client) == "5.9.3"
+        client.get.assert_not_called()
+
 
 class TestResolveLatestVersion:
     def test_installer_without_version_url_returns_none(self):

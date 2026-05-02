@@ -1,10 +1,11 @@
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 from ptm.models import ToolSpec
+from ptm.package_managers import is_npm_registry_package_type
 
 PTM_TOOLS_DIR = (
     Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share"))
@@ -19,15 +20,6 @@ class CleanCandidate:
     tool_dir: Path
 
 
-@dataclass(frozen=True)
-class ToolMetadata:
-    bin: str
-    type: str
-    links: list[str]
-    installed_at: str
-    ptm_version: str = "1"
-
-
 def get_tool_dir(bin_name: str, tools_dir: Path = PTM_TOOLS_DIR) -> Path:
     return tools_dir / bin_name
 
@@ -38,14 +30,17 @@ def get_current_dir(bin_name: str, tools_dir: Path = PTM_TOOLS_DIR) -> Path:
 
 def write_tool_metadata(spec: ToolSpec, tool_dir: Path, links: list[Path]) -> None:
     tool_dir.mkdir(parents=True, exist_ok=True)
-    metadata = ToolMetadata(
-        bin=spec.bin,
-        type=spec.type,
-        links=[str(link) for link in links],
-        installed_at=datetime.now(UTC).isoformat(),
-    )
+    metadata = {
+        "bin": spec.bin,
+        "type": spec.type,
+        "links": [str(link) for link in links],
+        "installed_at": datetime.now(UTC).isoformat(),
+        "ptm_version": "1",
+    }
+    if is_npm_registry_package_type(spec.type):
+        metadata["package"] = spec.package
     (tool_dir / ".ptm.json").write_text(
-        json.dumps(asdict(metadata), indent=2, sort_keys=True) + "\n",
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
 

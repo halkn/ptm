@@ -21,7 +21,19 @@ def test_write_tool_metadata_records_links(tmp_path: Path) -> None:
     assert data["bin"] == "rg"
     assert data["type"] == "github_release"
     assert data["links"] == [str(link)]
+    assert "package" not in data
     assert "installed_at" in data
+
+
+def test_write_tool_metadata_records_package_name(tmp_path: Path) -> None:
+    tool_dir = tmp_path / "tools" / "tsc"
+    link = tmp_path / "bin" / "tsc"
+    spec = ToolSpec(bin="tsc", type="npm", package="typescript")
+
+    write_tool_metadata(spec, tool_dir, [link])
+
+    data = json.loads((tool_dir / ".ptm.json").read_text(encoding="utf-8"))
+    assert data["package"] == "typescript"
 
 
 def test_is_link_to_tool_dir_only_accepts_links_into_tool_dir(tmp_path: Path) -> None:
