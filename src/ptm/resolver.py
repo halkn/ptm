@@ -112,10 +112,6 @@ def get_comparable_version(spec: ToolSpec, version: str | None) -> str | None:
     return version
 
 
-def get_comparable_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
-    return get_comparable_version(spec, resolve_latest_version(spec, client))
-
-
 def resolve_install_plan(spec: ToolSpec, client: httpx.Client) -> InstallPlan:
     match spec.type:
         case "github_release":
@@ -370,10 +366,6 @@ def _infer_extract_type(asset_name: str, spec: ToolSpec) -> str:
     return "raw_binary"
 
 
-def resolve_asset_url(spec: ToolSpec, tag: str, client: httpx.Client) -> str:
-    return resolve_github_release_asset(spec, tag, client).url
-
-
 def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
     if not spec.platforms:
         return _resolve_known_url_release_asset(spec, version)
@@ -385,10 +377,6 @@ def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
         url=url,
         extract=_infer_extract_type(url, spec),
     )
-
-
-def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
-    return resolve_url_release_asset(spec, version).url
 
 
 def _resolve_known_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
