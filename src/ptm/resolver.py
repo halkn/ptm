@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 import httpx
 
+from ptm.asset_matcher import score_asset_name
 from ptm.models import InstallPlan, ToolSpec
 from ptm.package_managers import is_npm_registry_package_type
 
@@ -17,31 +18,12 @@ class ResolvedAsset:
     extract: str
 
 
-_OS_TOKENS: dict[str, tuple[str, ...]] = {
-    "linux": ("linux",),
-    "darwin": ("darwin", "macos", "osx", "apple-darwin"),
-}
-_ARCH_TOKENS: dict[str, tuple[str, ...]] = {
-    "x86_64": ("x86_64", "amd64", "x64"),
-    "arm64": ("arm64", "aarch64"),
-}
 _NODE_DIST_PLATFORM_ALIASES: dict[str, str] = {
     "linux-x86_64": "linux-x64",
     "linux-arm64": "linux-arm64",
     "darwin-x86_64": "darwin-x64",
     "darwin-arm64": "darwin-arm64",
 }
-_EXCLUDED_ASSET_TOKENS = (
-    "checksums",
-    "checksum",
-    "sha256",
-    "sha512",
-    "provenance",
-    "sbom",
-    ".sig",
-    ".asc",
-)
-_LIGHTWEIGHT_VARIANT_TOKENS = ("light", "lite", "minimal", "slim")
 
 
 def detect_platform() -> str:
@@ -110,10 +92,6 @@ def get_comparable_version(spec: ToolSpec, version: str | None) -> str | None:
     ):
         return version.removeprefix("v")
     return version
-
-
-def get_comparable_latest_version(spec: ToolSpec, client: httpx.Client) -> str | None:
-    return get_comparable_version(spec, resolve_latest_version(spec, client))
 
 
 def resolve_install_plan(spec: ToolSpec, client: httpx.Client) -> InstallPlan:
@@ -240,6 +218,7 @@ def _resolve_github_release_asset_from_release(
     if not isinstance(raw_assets, list):
         raise RuntimeError(f"{spec.bin}: invalid release assets payload")
 
+    platform_key = detect_platform()
     scored_assets: list[tuple[int, ResolvedAsset]] = []
     for raw_asset in raw_assets:
         if not isinstance(raw_asset, dict):
@@ -249,7 +228,7 @@ def _resolve_github_release_asset_from_release(
         download_url = asset.get("browser_download_url")
         if not isinstance(name, str) or not isinstance(download_url, str):
             continue
-        score = _score_asset_name(spec, name)
+        score = score_asset_name(spec, name, platform_key)
         if score is None:
             continue
         scored_assets.append(
@@ -264,7 +243,6 @@ def _resolve_github_release_asset_from_release(
         )
 
     if not scored_assets:
-        platform_key = detect_platform()
         raise RuntimeError(
             f"{spec.bin}: no release asset matched platform '{platform_key}'; "
             "set [tools.<name>.platforms] to override asset selection"
@@ -274,7 +252,6 @@ def _resolve_github_release_asset_from_release(
     best_score, best_asset = scored_assets[0]
     tied_assets = [asset.name for score, asset in scored_assets if score == best_score]
     if len(tied_assets) > 1:
-        platform_key = detect_platform()
         candidates = ", ".join(tied_assets)
         raise RuntimeError(
             f"{spec.bin}: multiple release assets matched platform '{platform_key}': "
@@ -300,65 +277,6 @@ def _get_github_release(
     return data
 
 
-def _score_asset_name(spec: ToolSpec, asset_name: str) -> int | None:
-    platform_key = detect_platform()
-    os_name, arch = platform_key.split("-", maxsplit=1)
-    normalized = asset_name.lower()
-    if any(token in normalized for token in _EXCLUDED_ASSET_TOKENS):
-        return None
-
-    os_tokens = _OS_TOKENS.get(os_name, (os_name,))
-    arch_tokens = _ARCH_TOKENS.get(arch, (arch,))
-    if not any(token in normalized for token in os_tokens):
-        return None
-
-    all_arch_tokens = {
-        token
-        for known_arch, tokens in _ARCH_TOKENS.items()
-        if known_arch != arch
-        for token in tokens
-    }
-    has_matching_arch = any(token in normalized for token in arch_tokens)
-    has_other_arch = any(token in normalized for token in all_arch_tokens)
-    if has_other_arch or (not has_matching_arch and _has_arch_token(normalized)):
-        return None
-
-    score = 200
-    if spec.bin.lower() in normalized:
-        score += 20
-    if has_matching_arch:
-        score += 12
-    if any(token in normalized for token in _LIGHTWEIGHT_VARIANT_TOKENS):
-        score -= 6
-
-    if os_name == "linux":
-        if "musl" in normalized:
-            score += 8
-        elif "gnu" in normalized:
-            score += 4
-
-    if normalized.endswith(".tar.xz"):
-        score += 5
-    elif normalized.endswith(".tar.gz"):
-        score += 4
-    elif normalized.endswith(".zip"):
-        score += 3
-    elif normalized.endswith(".gz"):
-        score += 2
-    else:
-        score += 1
-
-    return score
-
-
-def _has_arch_token(asset_name: str) -> bool:
-    return any(
-        token in asset_name
-        for arch_tokens in _ARCH_TOKENS.values()
-        for token in arch_tokens
-    )
-
-
 def _infer_extract_type(asset_name: str, spec: ToolSpec) -> str:
     if asset_name.endswith((".tar.gz", ".tar.xz")):
         full_archive = bool(spec.bin_path_in_archive or spec.extra_bins)
@@ -368,10 +286,6 @@ def _infer_extract_type(asset_name: str, spec: ToolSpec) -> str:
     if asset_name.endswith(".zip"):
         return "zip_binary"
     return "raw_binary"
-
-
-def resolve_asset_url(spec: ToolSpec, tag: str, client: httpx.Client) -> str:
-    return resolve_github_release_asset(spec, tag, client).url
 
 
 def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
@@ -385,10 +299,6 @@ def resolve_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:
         url=url,
         extract=_infer_extract_type(url, spec),
     )
-
-
-def resolve_url_release_url(spec: ToolSpec, version: str) -> str:
-    return resolve_url_release_asset(spec, version).url
 
 
 def _resolve_known_url_release_asset(spec: ToolSpec, version: str) -> ResolvedAsset:

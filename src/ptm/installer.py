@@ -8,7 +8,7 @@ import subprocess
 import tarfile
 import tempfile
 import zipfile
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import httpx
@@ -55,6 +55,29 @@ def _activate_managed_current_dir(spec: ToolSpec, staging_dir: Path) -> Path:
     return current_dir
 
 
+def _publish_links(link_targets: list[tuple[Path, Path]]) -> list[Path]:
+    for _link, target in link_targets:
+        if not target.exists():
+            raise FileNotFoundError(f"{target} not found")
+
+    for link, _target in link_targets:
+        link.unlink(missing_ok=True)
+
+    for link, target in link_targets:
+        link.symlink_to(target)
+    return [link for link, _target in link_targets]
+
+
+def _run_staged_install(spec: ToolSpec, install: Callable[[Path], None]) -> None:
+    staging_dir = _prepare_managed_staging_dir(spec)
+    try:
+        install(staging_dir)
+        _activate_managed_current_dir(spec, staging_dir)
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+
+
 def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     bin_path = Path(spec.bin_path_in_archive or spec.bin)
@@ -64,17 +87,7 @@ def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
         (BIN_DIR / extra, current_dir / bin_dir_in_archive / extra)
         for extra in spec.extra_bins
     )
-
-    for _link, target in link_targets:
-        if not target.exists():
-            raise FileNotFoundError(f"{target} not found")
-
-    for link, _target in link_targets:
-        link.unlink(missing_ok=True)
-
-    for link, target in link_targets:
-        link.symlink_to(target)
-    return [link for link, _target in link_targets]
+    return _publish_links(link_targets)
 
 
 def _publish_package_manager_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
@@ -84,17 +97,7 @@ def _publish_package_manager_links(spec: ToolSpec, current_dir: Path) -> list[Pa
     link_targets.extend(
         (BIN_DIR / extra, package_bin_dir / extra) for extra in spec.extra_bins
     )
-
-    for _link, target in link_targets:
-        if not target.exists():
-            raise FileNotFoundError(f"{target} not found")
-
-    for link, _target in link_targets:
-        link.unlink(missing_ok=True)
-
-    for link, target in link_targets:
-        link.symlink_to(target)
-    return [link for link, _target in link_targets]
+    return _publish_links(link_targets)
 
 
 def _validate_package_manager_links(spec: ToolSpec, staging_dir: Path) -> None:
@@ -141,18 +144,14 @@ def _install_tar(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_path, client)
 
-        dest_dir = _prepare_managed_staging_dir(spec)
-
-        try:
+        def extract_archive(dest_dir: Path) -> None:
             with tarfile.open(tmp_path, "r:*") as tf:
                 members = list(
                     _strip_components(tf.getmembers(), spec.strip_components)
                 )
                 tf.extractall(dest_dir, members=members, filter="data")
-            _activate_managed_current_dir(spec, dest_dir)
-        except Exception:
-            shutil.rmtree(dest_dir, ignore_errors=True)
-            raise
+
+        _run_staged_install(spec, extract_archive)
 
 
 def _install_tar_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -161,15 +160,12 @@ def _install_tar_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_path, client)
 
-        staging_dir = _prepare_managed_staging_dir(spec)
-        try:
+        def extract_binary(staging_dir: Path) -> None:
             _extract_binary_from_tar(tmp_path, spec.bin, staging_dir)
             dest = staging_dir / spec.bin
             _make_executable(dest)
-            _activate_managed_current_dir(spec, staging_dir)
-        except Exception:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            raise
+
+        _run_staged_install(spec, extract_binary)
 
 
 def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -178,16 +174,13 @@ def _install_gz_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_gz, client)
 
-        staging_dir = _prepare_managed_staging_dir(spec)
-        try:
+        def extract_binary(staging_dir: Path) -> None:
             dest = staging_dir / spec.bin
             with gzip.open(tmp_gz, "rb") as gz_in:
                 dest.write_bytes(gz_in.read())
             _make_executable(dest)
-            _activate_managed_current_dir(spec, staging_dir)
-        except Exception:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            raise
+
+        _run_staged_install(spec, extract_binary)
 
 
 def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
@@ -196,8 +189,7 @@ def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
         console.print(f"  Downloading {url}")
         _download(url, tmp_zip, client)
 
-        staging_dir = _prepare_managed_staging_dir(spec)
-        try:
+        def extract_binary(staging_dir: Path) -> None:
             with zipfile.ZipFile(tmp_zip) as zf:
                 for info in zf.infolist():
                     if Path(info.filename).name == spec.bin and not info.is_dir():
@@ -205,26 +197,21 @@ def _install_zip_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
                         dest = staging_dir / spec.bin
                         dest.write_bytes(data)
                         _make_executable(dest)
-                        _activate_managed_current_dir(spec, staging_dir)
                         return
-        except Exception:
-            shutil.rmtree(staging_dir, ignore_errors=True)
-            raise
-        shutil.rmtree(staging_dir, ignore_errors=True)
-    raise FileNotFoundError(f"{spec.bin} not found in zip archive")
+            raise FileNotFoundError(f"{spec.bin} not found in zip archive")
+
+        _run_staged_install(spec, extract_binary)
 
 
 def _install_raw_binary(spec: ToolSpec, url: str, client: httpx.Client) -> None:
-    staging_dir = _prepare_managed_staging_dir(spec)
-    dest = staging_dir / spec.bin
     console.print(f"  Downloading {url}")
-    try:
+
+    def install_binary(staging_dir: Path) -> None:
+        dest = staging_dir / spec.bin
         _download(url, dest, client)
         _make_executable(dest)
-        _activate_managed_current_dir(spec, staging_dir)
-    except Exception:
-        shutil.rmtree(staging_dir, ignore_errors=True)
-        raise
+
+    _run_staged_install(spec, install_binary)
 
 
 def _dispatch_extract(
