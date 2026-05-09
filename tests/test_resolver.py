@@ -473,8 +473,7 @@ class TestResolveUrlReleaseAsset:
         with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
             asset = resolve_url_release_asset(spec, "v22.0.0")
         assert (
-            asset.url
-            == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
+            asset.url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
         )
 
     def test_auto_resolves_node_dist_url_when_platforms_are_omitted(self):
@@ -486,8 +485,7 @@ class TestResolveUrlReleaseAsset:
         with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
             asset = resolve_url_release_asset(spec, "v22.0.0")
         assert (
-            asset.url
-            == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
+            asset.url == "https://nodejs.org/dist/v22.0.0/node-v22.0.0-linux-x64.tar.xz"
         )
 
     def test_auto_resolves_node_dist_url_for_darwin_arm64(self):

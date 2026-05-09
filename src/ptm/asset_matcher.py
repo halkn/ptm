@@ -21,9 +21,7 @@ _EXCLUDED_ASSET_TOKENS = (
 _LIGHTWEIGHT_VARIANT_TOKENS = ("light", "lite", "minimal", "slim")
 
 
-def score_asset_name(
-    spec: ToolSpec, asset_name: str, platform_key: str
-) -> int | None:
+def score_asset_name(spec: ToolSpec, asset_name: str, platform_key: str) -> int | None:
     os_name, arch = platform_key.split("-", maxsplit=1)
     normalized = asset_name.lower()
     if any(token in normalized for token in _EXCLUDED_ASSET_TOKENS):
