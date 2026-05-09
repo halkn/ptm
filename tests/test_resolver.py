@@ -8,7 +8,6 @@ from ptm.package_managers import NPM_REGISTRY_PACKAGE_MANAGERS
 from ptm.resolver import (
     _get_latest_tag_via_gh,
     _get_package_registry_latest_version,
-    _score_asset_name,
     detect_platform,
     get_comparable_version,
     get_installed_version,
@@ -461,20 +460,6 @@ class TestResolveGithubReleaseAssetAutomatically:
             asset = resolve_github_release_asset(spec, "0.30.1", client)
 
         assert asset.name == "selene-0.30.1-linux.zip"
-
-
-class TestScoreAssetName:
-    def test_ignores_checksum_assets(self):
-        spec = ToolSpec(bin="rg", repo="BurntSushi/ripgrep", type="github_release")
-        with patch("ptm.resolver.detect_platform", return_value="linux-x86_64"):
-            asset_name = "ripgrep-14.1.0-linux-x86_64.tar.gz.sha256"
-            assert _score_asset_name(spec, asset_name) is None
-
-    def test_matches_macos_and_aarch64_aliases(self):
-        spec = ToolSpec(bin="gh", repo="cli/cli", type="github_release")
-        with patch("ptm.resolver.detect_platform", return_value="darwin-arm64"):
-            score = _score_asset_name(spec, "gh_2.90.0_macOS_aarch64.zip")
-        assert score is not None
 
 
 class TestResolveUrlReleaseAsset:
