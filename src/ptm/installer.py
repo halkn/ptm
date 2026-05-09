@@ -55,6 +55,19 @@ def _activate_managed_current_dir(spec: ToolSpec, staging_dir: Path) -> Path:
     return current_dir
 
 
+def _publish_links(link_targets: list[tuple[Path, Path]]) -> list[Path]:
+    for _link, target in link_targets:
+        if not target.exists():
+            raise FileNotFoundError(f"{target} not found")
+
+    for link, _target in link_targets:
+        link.unlink(missing_ok=True)
+
+    for link, target in link_targets:
+        link.symlink_to(target)
+    return [link for link, _target in link_targets]
+
+
 def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
     BIN_DIR.mkdir(parents=True, exist_ok=True)
     bin_path = Path(spec.bin_path_in_archive or spec.bin)
@@ -64,17 +77,7 @@ def _publish_release_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
         (BIN_DIR / extra, current_dir / bin_dir_in_archive / extra)
         for extra in spec.extra_bins
     )
-
-    for _link, target in link_targets:
-        if not target.exists():
-            raise FileNotFoundError(f"{target} not found")
-
-    for link, _target in link_targets:
-        link.unlink(missing_ok=True)
-
-    for link, target in link_targets:
-        link.symlink_to(target)
-    return [link for link, _target in link_targets]
+    return _publish_links(link_targets)
 
 
 def _publish_package_manager_links(spec: ToolSpec, current_dir: Path) -> list[Path]:
@@ -84,17 +87,7 @@ def _publish_package_manager_links(spec: ToolSpec, current_dir: Path) -> list[Pa
     link_targets.extend(
         (BIN_DIR / extra, package_bin_dir / extra) for extra in spec.extra_bins
     )
-
-    for _link, target in link_targets:
-        if not target.exists():
-            raise FileNotFoundError(f"{target} not found")
-
-    for link, _target in link_targets:
-        link.unlink(missing_ok=True)
-
-    for link, target in link_targets:
-        link.symlink_to(target)
-    return [link for link, _target in link_targets]
+    return _publish_links(link_targets)
 
 
 def _validate_package_manager_links(spec: ToolSpec, staging_dir: Path) -> None:
