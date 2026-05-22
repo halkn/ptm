@@ -107,158 +107,112 @@ Tools installed before this managed-root layout are not adopted automatically. `
 
 ## Configuration
 
-Define managed tools in `~/.config/ptm/config.toml`.
-
-Tools can be managed in four ways.
-
----
-
-### `[tools.<name>]` - Define a Tool
+Define managed tools in `~/.config/ptm/config.toml`. Most tools fit on a single
+line: the table key is the binary name and the value is a `backend:source`
+string.
 
 ```toml
-[tools.rg]
-type = "github_release"
-repo = "BurntSushi/ripgrep"
-version_regex = 'ripgrep ([\d.]+)'
-
-[tools.rg.platforms]
-linux-x86_64 = "ripgrep-{version}-x86_64-unknown-linux-musl.tar.gz"
-darwin-arm64 = "ripgrep-{version}-aarch64-apple-darwin.tar.gz"
+[tools]
+rg = "github:BurntSushi/ripgrep"
+fd = "github:sharkdp/fd"
+nvim = "github:neovim/neovim@nightly"
+prettier = "npm:prettier@3.2.0"
+tsc = "npm:typescript"
+markdownlint-cli2 = "bun:markdownlint-cli2"
 ```
 
-`<name>` is the logical tool name. If `bin` is omitted, `<name>` is used as the binary name.
+The platform-specific release asset is detected automatically, so `platforms`,
+`version_regex`, and the like are usually unnecessary.
 
-### `type = "github_release"` - Install from GitHub Releases
+### Source strings
 
-| Field                 | Required | Description                                                                              |
-| --------------------- | -------- | ---------------------------------------------------------------------------------------- |
-| `bin`                 | yes      | Binary name                                                                              |
-| `repo`                | yes      | GitHub repository in `owner/repo` format                                                 |
-| `platforms`           | yes      | Mapping of platform keys to asset file names                                             |
-| `version`             |          | Version to install. Defaults to `latest`; `nightly` is also supported                    |
-| `version_regex`       |          | Regular expression used to extract the version string                                    |
-| `version_cmd`         |          | Version check command. Defaults to `[bin, "--version"]`                                  |
-| `bin_path_in_archive` |          | Binary path inside the archive when the full archive should be extracted                 |
-| `strip_components`    |          | Number of leading path components to strip when extracting tar archives. Defaults to `1` |
-| `extra_bins`          |          | Additional binary names to symlink                                                       |
+A source is `backend:locator[@version]`.
 
-**Platform keys:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
+| Backend     | Type             | Locator             | Example                              |
+| ----------- | ---------------- | ------------------- | ------------------------------------ |
+| `github`    | GitHub Releases  | `owner/repo`        | `github:BurntSushi/ripgrep`          |
+| `npm`       | npm package      | package name        | `npm:prettier`, `npm:@angular/cli`   |
+| `bun`       | Bun package      | package name        | `bun:markdownlint-cli2`              |
+| `url`       | Any release URL  | _(use table form)_  | see below                            |
+| `installer` | Custom installer | install script URL  | `installer:https://astral.sh/uv/install.sh` |
 
-**Template variables:**
+- The table key becomes both the logical name and the binary name, so renamed
+  binaries (`rg` from `ripgrep`) need no extra field.
+- `@version` pins a version and defaults to `latest`. `nightly` is also
+  supported for GitHub releases. The leading `@` of a scoped npm package is not
+  treated as a version (`npm:@angular/cli@18` pins `18`).
+- For `npm` / `bun`, the locator defaults to the binary name when omitted
+  (`tsc = "npm:typescript"` installs `typescript` and runs `tsc`).
 
-- `{tag}` - Tag name, for example `v1.2.3`
-- `{version}` - Version without the leading `v`, for example `1.2.3`
+### Table form for advanced options
 
-**Extracting a full archive:**
+When a tool needs more than a source string, use a `[tools.<name>]` table with a
+`source` key plus any overrides. Explicit fields take precedence over the
+source string.
 
 ```toml
+# Full-archive extraction and extra binaries
 [tools.nvim]
-type = "github_release"
-repo = "neovim/neovim"
-version = "nightly"
+source = "github:neovim/neovim@nightly"
 bin_path_in_archive = "bin/nvim"
-version_regex = 'NVIM v([\d.]+-dev[^\s]*|[\d.]+)'
 
-[tools.nvim.platforms]
-linux-x86_64 = "nvim-linux-x86_64.tar.gz"
-darwin-arm64 = "nvim-macos-arm64.tar.gz"
-```
-
----
-
-### `type = "url_release"` - Install from Any URL
-
-Use this for hosting services other than GitHub, such as official Node.js releases.
-
-```toml
+# Node.js from the official dist server
 [tools.node]
-type = "url_release"
+source = "url"
 version = "lts"
 version_url = "https://nodejs.org/dist/index.json"
 version_url_regex = '"version":"(v[\d.]+)"[^}]*"lts":"'
 bin_path_in_archive = "bin/node"
-strip_components = 1
 extra_bins = ["npm", "npx", "corepack"]
 version_regex = 'v([\d.]+)'
 
 [tools.node.platforms]
 linux-x86_64 = "https://nodejs.org/dist/v{version}/node-v{version}-linux-x64.tar.xz"
-darwin-arm64  = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64.tar.xz"
-```
+darwin-arm64 = "https://nodejs.org/dist/v{version}/node-v{version}-darwin-arm64.tar.xz"
 
-In addition to the fields shared with `github_release`, these fields are available.
-
-| Field               | Required | Description                                                                    |
-| ------------------- | -------- | ------------------------------------------------------------------------------ |
-| `version_url`       |          | URL used to fetch the latest version                                           |
-| `version_url_regex` |          | Regular expression used to extract the version from the `version_url` response |
-
-Values in `platforms` must be **full URLs**, not asset file names.
-
-If `platforms` is omitted, automatic resolution currently supports only the `node` configuration that uses `https://nodejs.org/dist/index.json`. Other `url_release` tools require explicit `platforms`.
-
----
-
-### `type = "installer"` - Custom Installer
-
-Use this for official installation scripts and similar installers.
-
-```toml
+# Official installer script with a version endpoint for update checks
 [tools.uv]
-type = "installer"
-url = "https://astral.sh/uv/install.sh"
+source = "installer:https://astral.sh/uv/install.sh"
 update_command = "uv self update"
 version_url = "https://pypi.org/pypi/uv/json"
 version_url_regex = '"version":"([\d.]+)"'
 version_regex = 'uv ([\d.]+)'
 ```
 
-| Field               | Required | Description                                                                           |
-| ------------------- | -------- | ------------------------------------------------------------------------------------- |
-| `bin`               | yes      | Binary name                                                                           |
-| `url`               |          | Installation script URL, executed as `curl \| sh`                                     |
-| `command`           |          | Shell command to run during installation                                              |
-| `update_command`    |          | Command to run during updates. Uses `command` when omitted                            |
-| `version_url`       |          | URL used by `ptm check` and `ptm update` to fetch the latest version                  |
-| `version_url_regex` |          | Regular expression used to extract the latest version from the `version_url` response |
+### Fields
 
-Specify either `url` or `command`.
+| Field                 | Backends                 | Description                                                                              |
+| --------------------- | ------------------------ | ---------------------------------------------------------------------------------------- |
+| `source`              | all (table form)         | `backend:locator[@version]` string                                                       |
+| `version`             | all                      | Version to install. Defaults to `latest`; `nightly` for GitHub releases                  |
+| `version_cmd`         | all                      | Version check command. Defaults to `[bin, "--version"]`                                  |
+| `version_regex`       | all                      | Regular expression used to extract the installed version string                          |
+| `platforms`           | `github`, `url`          | Override automatic asset selection. Maps platform keys to asset names (`github`) or full URLs (`url`) |
+| `bin_path_in_archive` | `github`, `url`          | Binary path inside the archive when the full archive should be extracted                 |
+| `strip_components`    | `github`, `url`          | Leading path components to strip when extracting tar archives. Defaults to `1`           |
+| `extra_bins`          | `github`, `url`, `npm`, `bun` | Additional binary names to symlink                                                  |
+| `version_url`         | `url`, `installer`       | URL used to fetch the latest version                                                     |
+| `version_url_regex`   | `url`, `installer`       | Regular expression used to extract the version from the `version_url` response           |
+| `command`             | `installer`              | Shell command to run during installation (alternative to the install script URL)        |
+| `update_command`      | `installer`              | Command to run during updates. Uses `command` when omitted                               |
 
-An `installer` with `version_url` is included in latest-version comparisons, just like `url_release`. This is useful for tools such as `uv`, where the official installer performs installation but a public API or JSON endpoint can provide the latest version.
+**Platform keys:** `linux-x86_64` / `linux-arm64` / `darwin-arm64` / `darwin-x86_64`
 
----
+**Template variables** (in `platforms` values): `{tag}` (tag name, e.g. `v1.2.3`)
+and `{version}` (without the leading `v`, e.g. `1.2.3`).
 
-### `type = "npm"` / `type = "bun"` - npm / Bun Packages
+For `url` tools, `platforms` values must be full URLs. Automatic resolution
+without `platforms` currently supports only the `node` configuration that uses
+`https://nodejs.org/dist/index.json`.
 
-Use this for tools distributed as npm or Bun packages. `ptm` installs each package into its own managed directory and links binaries into `$XDG_BIN_HOME`; it does not use your npm or Bun global package directory.
+`npm` / `bun` tools are installed into an isolated managed directory (not your
+global package directory) and their binaries are linked into `$XDG_BIN_HOME`.
+When the version is `latest`, both compare against the latest version through
+the npm registry metadata API; pinned versions are installed and compared as-is.
 
-```toml
-[tools.markdownlint-cli2]
-type = "npm"
-version_regex = 'markdownlint-cli2 v([\d.]+)'
-
-[tools.tsc]
-type = "npm"
-package = "typescript"
-version_cmd = ["tsc", "--version"]
-version_regex = 'Version ([\d.]+)'
-
-[tools.prettier]
-type = "bun"
-```
-
-| Field           | Required | Description                                                 |
-| --------------- | -------- | ----------------------------------------------------------- |
-| `bin`           | yes      | Binary name                                                 |
-| `package`       |          | npm / Bun package name. Defaults to `bin`                   |
-| `version`       |          | Package version to install. Defaults to `latest`            |
-| `version_cmd`   |          | Version check command. Defaults to `[bin, "--version"]`     |
-| `version_regex` |          | Regular expression used to extract the version string       |
-| `extra_bins`    |          | Additional binary names to symlink from `node_modules/.bin` |
-
-`type = "npm"` creates an isolated package project under the managed tool directory and runs `npm install --prefix <tool-dir>`.
-`type = "bun"` creates an isolated package project under the managed tool directory and runs `bun install --cwd <tool-dir>`.
-When `version = "latest"` is used, both compare against the latest version through the npm registry metadata API. Fixed versions are installed and compared as pinned versions.
+An `installer` with `version_url` is included in latest-version comparisons,
+which is useful for tools such as `uv` where the installer performs installation
+but a public endpoint provides the latest version.
 
 ---
 
