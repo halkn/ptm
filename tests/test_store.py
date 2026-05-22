@@ -5,6 +5,7 @@ from ptm.models import ToolSpec
 from ptm.store import (
     CleanCandidate,
     collect_clean_candidates,
+    get_installed_manifest_version,
     is_link_to_tool_dir,
     write_tool_metadata,
 )
@@ -23,6 +24,60 @@ def test_write_tool_metadata_records_links(tmp_path: Path) -> None:
     assert data["links"] == [str(link)]
     assert "package" not in data
     assert "installed_at" in data
+
+
+def test_write_tool_metadata_records_version(tmp_path: Path) -> None:
+    tool_dir = tmp_path / "tools" / "rg"
+    spec = ToolSpec(bin="rg", type="github_release")
+
+    write_tool_metadata(spec, tool_dir, [], version="14.1.0")
+
+    data = json.loads((tool_dir / ".ptm.json").read_text(encoding="utf-8"))
+    assert data["version"] == "14.1.0"
+
+
+def test_write_tool_metadata_omits_version_when_absent(tmp_path: Path) -> None:
+    tool_dir = tmp_path / "tools" / "rg"
+    spec = ToolSpec(bin="rg", type="github_release")
+
+    write_tool_metadata(spec, tool_dir, [])
+
+    data = json.loads((tool_dir / ".ptm.json").read_text(encoding="utf-8"))
+    assert "version" not in data
+
+
+def test_get_installed_manifest_version_reads_version(tmp_path: Path) -> None:
+    tools_dir = tmp_path / "tools"
+    (tools_dir / "rg" / "current").mkdir(parents=True)
+    write_tool_metadata(
+        ToolSpec(bin="rg", type="github_release"),
+        tools_dir / "rg",
+        [],
+        version="14.1.0",
+    )
+
+    assert get_installed_manifest_version("rg", tools_dir) == "14.1.0"
+
+
+def test_get_installed_manifest_version_none_without_current_dir(
+    tmp_path: Path,
+) -> None:
+    tools_dir = tmp_path / "tools"
+    write_tool_metadata(
+        ToolSpec(bin="rg", type="github_release"),
+        tools_dir / "rg",
+        [],
+        version="14.1.0",
+    )
+
+    assert get_installed_manifest_version("rg", tools_dir) is None
+
+
+def test_get_installed_manifest_version_none_without_manifest(tmp_path: Path) -> None:
+    tools_dir = tmp_path / "tools"
+    (tools_dir / "rg" / "current").mkdir(parents=True)
+
+    assert get_installed_manifest_version("rg", tools_dir) is None
 
 
 def test_write_tool_metadata_records_package_name(tmp_path: Path) -> None:

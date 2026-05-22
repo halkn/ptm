@@ -17,7 +17,7 @@ from ptm.config import BIN_DIR
 from ptm.console import console
 from ptm.models import InstallPlan, ToolSpec
 from ptm.package_managers import get_package_manager, is_npm_registry_package_type
-from ptm.resolver import get_installed_version, resolve_install_plan
+from ptm.resolver import installed_version, resolve_install_plan
 from ptm.store import PTM_TOOLS_DIR, get_current_dir, get_tool_dir, write_tool_metadata
 
 
@@ -240,7 +240,7 @@ def _install_release_plan(plan: InstallPlan, client: httpx.Client) -> None:
     current_dir = get_current_dir(plan.spec.bin, PTM_TOOLS_DIR)
     links = _publish_release_links(plan.spec, current_dir)
     tool_dir = get_tool_dir(plan.spec.bin, PTM_TOOLS_DIR)
-    write_tool_metadata(plan.spec, tool_dir, links)
+    write_tool_metadata(plan.spec, tool_dir, links, version=plan.version)
 
 
 def _run_installer(spec: ToolSpec, update: bool = False) -> None:
@@ -271,6 +271,16 @@ def _write_package_project(spec: ToolSpec, staging_dir: Path) -> None:
     )
 
 
+def _read_installed_package_version(spec: ToolSpec, root: Path) -> str | None:
+    package_json = root / "node_modules" / Path(spec.package) / "package.json"
+    try:
+        data = json.loads(package_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    version = data.get("version") if isinstance(data, dict) else None
+    return version if isinstance(version, str) and version else None
+
+
 def _package_manager_install_command(manager: str, staging_dir: Path) -> list[str]:
     executable = get_package_manager(manager).executable
     match manager:
@@ -293,7 +303,8 @@ def _install_package_manager_package(spec: ToolSpec, manager: str) -> None:
         current_dir = _activate_managed_current_dir(spec, staging_dir)
         links = _publish_package_manager_links(spec, current_dir)
         tool_dir = get_tool_dir(spec.bin, PTM_TOOLS_DIR)
-        write_tool_metadata(spec, tool_dir, links)
+        version = _read_installed_package_version(spec, current_dir) or spec.version
+        write_tool_metadata(spec, tool_dir, links, version=version)
     except Exception:
         if staging_dir.exists() or staging_dir.is_symlink():
             shutil.rmtree(staging_dir, ignore_errors=True)
@@ -320,7 +331,7 @@ def do_install(
                 _install_package_manager_package(spec, spec.type)
             case _:
                 raise ValueError(f"Unknown type: {spec.type}")
-        console.print(f"  [green]Done.[/green] {get_installed_version(spec) or ''}")
+        console.print(f"  [green]Done.[/green] {installed_version(spec) or ''}")
         return True
     except Exception as e:
         console.print(f"  [red]Failed: {e}[/red]")

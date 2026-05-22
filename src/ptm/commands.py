@@ -12,7 +12,7 @@ from ptm.installer import do_install
 from ptm.models import InstallPlan, ToolSpec
 from ptm.resolver import (
     get_comparable_version,
-    get_installed_version,
+    installed_version,
     resolve_install_plan,
     version_status,
 )
@@ -44,7 +44,7 @@ def cmd_install(
 ) -> None:
     failed = False
     for spec in _filter_tools(tools, target):
-        installed = get_installed_version(spec)
+        installed = installed_version(spec)
         if installed is not None and target is None:
             console.print(
                 f"[dim]  {spec.bin}: already installed ({installed}), skipping[/dim]"
@@ -104,7 +104,7 @@ def _collect_version_checks(
 
 
 def _check_update_version(spec: ToolSpec, client: httpx.Client) -> _VersionCheck:
-    installed = get_installed_version(spec)
+    installed = installed_version(spec)
     try:
         plan = resolve_install_plan(spec, client)
         latest = get_comparable_version(spec, plan.version)
@@ -122,7 +122,7 @@ def _check_update_version(spec: ToolSpec, client: httpx.Client) -> _VersionCheck
 
 
 def _check_display_version(spec: ToolSpec, client: httpx.Client) -> _VersionCheck:
-    installed = get_installed_version(spec)
+    installed = installed_version(spec)
 
     if spec.type == "installer" and not spec.version_url:
         return _VersionCheck(
@@ -166,7 +166,7 @@ def cmd_list(tools: list[ToolSpec]) -> None:
     table.add_column("Installed")
 
     for spec in tools:
-        installed = get_installed_version(spec)
+        installed = installed_version(spec)
         installed_str = installed if installed else "[red]not installed[/red]"
         table.add_row(spec.bin, spec.type, spec.version, installed_str)
 

@@ -9,6 +9,7 @@ import httpx
 from ptm.asset_matcher import score_asset_name
 from ptm.models import InstallPlan, ToolSpec
 from ptm.package_managers import is_npm_registry_package_type
+from ptm.store import get_installed_manifest_version
 
 
 @dataclass(frozen=True)
@@ -43,6 +44,13 @@ def get_installed_version(spec: ToolSpec) -> str | None:
         return m.group(1) if m else "unknown"
     except (FileNotFoundError, OSError, subprocess.CalledProcessError):
         return None
+
+
+def installed_version(spec: ToolSpec) -> str | None:
+    manifest_version = get_installed_manifest_version(spec.bin)
+    if manifest_version is not None:
+        return manifest_version
+    return get_installed_version(spec)
 
 
 def version_status(installed: str | None, latest: str) -> str:

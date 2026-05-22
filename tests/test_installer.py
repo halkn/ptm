@@ -396,6 +396,33 @@ class TestInstallPackageManagerPackage:
         assert package_json["dependencies"] == {"typescript": "5.9.3"}
 
     @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
+    def test_records_resolved_package_version(self, manager: str, tmp_path: Path):
+        spec = ToolSpec(bin="prettier", type=manager)
+        tools_dir = tmp_path / "tools"
+
+        def fake_run(_cmd: list[str], check: bool) -> None:
+            assert check
+            modules = tools_dir / "prettier" / "next" / "node_modules"
+            (modules / ".bin").mkdir(parents=True)
+            (modules / ".bin" / "prettier").write_text("bin", encoding="utf-8")
+            (modules / "prettier").mkdir(parents=True)
+            (modules / "prettier" / "package.json").write_text(
+                json.dumps({"version": "3.2.5"}), encoding="utf-8"
+            )
+
+        with (
+            patch("ptm.installer.BIN_DIR", tmp_path / "bin"),
+            patch("ptm.installer.PTM_TOOLS_DIR", tools_dir),
+            patch("subprocess.run", side_effect=fake_run),
+        ):
+            _install_package_manager_package(spec, manager)
+
+        metadata = json.loads(
+            (tools_dir / "prettier" / ".ptm.json").read_text(encoding="utf-8")
+        )
+        assert metadata["version"] == "3.2.5"
+
+    @pytest.mark.parametrize("manager", NPM_REGISTRY_PACKAGE_MANAGERS)
     def test_does_not_replace_existing_link_when_package_bin_is_missing(
         self, manager: str, tmp_path: Path
     ):
@@ -508,7 +535,7 @@ class TestDoInstall:
         with (
             patch("ptm.installer.resolve_install_plan", return_value=plan) as mock_plan,
             patch("ptm.installer._install_release_plan") as mock_install,
-            patch("ptm.installer.get_installed_version", return_value="14.1.0"),
+            patch("ptm.installer.installed_version", return_value="14.1.0"),
         ):
             do_install(spec, client)
         mock_plan.assert_called_once_with(spec, client)
@@ -526,7 +553,7 @@ class TestDoInstall:
         with (
             patch("ptm.installer.resolve_install_plan", return_value=plan) as mock_plan,
             patch("ptm.installer._install_release_plan") as mock_install,
-            patch("ptm.installer.get_installed_version", return_value="22.0.0"),
+            patch("ptm.installer.installed_version", return_value="22.0.0"),
         ):
             do_install(spec, client)
         mock_plan.assert_called_once_with(spec, client)
@@ -544,7 +571,7 @@ class TestDoInstall:
         with (
             patch("ptm.installer.resolve_install_plan") as mock_plan,
             patch("ptm.installer._install_release_plan") as mock_install,
-            patch("ptm.installer.get_installed_version", return_value="14.1.0"),
+            patch("ptm.installer.installed_version", return_value="14.1.0"),
         ):
             do_install(spec, client, plan=plan)
         mock_plan.assert_not_called()
@@ -555,7 +582,7 @@ class TestDoInstall:
         client = MagicMock()
         with (
             patch("ptm.installer._run_installer") as mock_run,
-            patch("ptm.installer.get_installed_version", return_value="0.5.0"),
+            patch("ptm.installer.installed_version", return_value="0.5.0"),
         ):
             do_install(spec, client)
         mock_run.assert_called_once_with(spec, update=False)
@@ -565,7 +592,7 @@ class TestDoInstall:
         client = MagicMock()
         with (
             patch("ptm.installer._run_installer") as mock_run,
-            patch("ptm.installer.get_installed_version", return_value="0.5.0"),
+            patch("ptm.installer.installed_version", return_value="0.5.0"),
         ):
             do_install(spec, client, update=True)
         mock_run.assert_called_once_with(spec, update=True)
@@ -576,7 +603,7 @@ class TestDoInstall:
         client = MagicMock()
         with (
             patch("ptm.installer._install_package_manager_package") as mock_run,
-            patch("ptm.installer.get_installed_version", return_value="0.15.0"),
+            patch("ptm.installer.installed_version", return_value="0.15.0"),
         ):
             do_install(spec, client)
         mock_run.assert_called_once_with(spec, tool_type)

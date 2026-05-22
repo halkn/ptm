@@ -13,6 +13,7 @@ from ptm.resolver import (
     get_installed_version,
     get_latest_tag,
     get_url_release_version,
+    installed_version,
     resolve_github_release_asset,
     resolve_install_plan,
     resolve_latest_version,
@@ -108,6 +109,25 @@ class TestGetInstalledVersion:
         spec = ToolSpec(bin="rg", version_regex=r"version: (\S+)")
         with patch("subprocess.check_output", return_value="no version here"):
             assert get_installed_version(spec) == "unknown"
+
+
+class TestInstalledVersion:
+    def test_prefers_manifest_version(self):
+        spec = ToolSpec(bin="rg")
+        with (
+            patch("ptm.resolver.get_installed_manifest_version", return_value="14.1.0"),
+            patch("ptm.resolver.get_installed_version") as mock_cmd,
+        ):
+            assert installed_version(spec) == "14.1.0"
+        mock_cmd.assert_not_called()
+
+    def test_falls_back_to_version_command(self):
+        spec = ToolSpec(bin="uv")
+        with (
+            patch("ptm.resolver.get_installed_manifest_version", return_value=None),
+            patch("ptm.resolver.get_installed_version", return_value="0.5.1"),
+        ):
+            assert installed_version(spec) == "0.5.1"
 
 
 class TestGetLatestTagViaGh:

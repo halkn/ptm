@@ -28,7 +28,12 @@ def get_current_dir(bin_name: str, tools_dir: Path = PTM_TOOLS_DIR) -> Path:
     return get_tool_dir(bin_name, tools_dir) / "current"
 
 
-def write_tool_metadata(spec: ToolSpec, tool_dir: Path, links: list[Path]) -> None:
+def write_tool_metadata(
+    spec: ToolSpec,
+    tool_dir: Path,
+    links: list[Path],
+    version: str | None = None,
+) -> None:
     tool_dir.mkdir(parents=True, exist_ok=True)
     metadata = {
         "bin": spec.bin,
@@ -37,12 +42,37 @@ def write_tool_metadata(spec: ToolSpec, tool_dir: Path, links: list[Path]) -> No
         "installed_at": datetime.now(UTC).isoformat(),
         "ptm_version": "1",
     }
+    if version:
+        metadata["version"] = version
     if is_npm_registry_package_type(spec.type):
         metadata["package"] = spec.package
     (tool_dir / ".ptm.json").write_text(
         json.dumps(metadata, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def read_tool_metadata(
+    bin_name: str, tools_dir: Path = PTM_TOOLS_DIR
+) -> dict[str, object] | None:
+    path = get_tool_dir(bin_name, tools_dir) / ".ptm.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def get_installed_manifest_version(
+    bin_name: str, tools_dir: Path = PTM_TOOLS_DIR
+) -> str | None:
+    if not get_current_dir(bin_name, tools_dir).exists():
+        return None
+    metadata = read_tool_metadata(bin_name, tools_dir)
+    if metadata is None:
+        return None
+    version = metadata.get("version")
+    return version if isinstance(version, str) and version else None
 
 
 def is_relative_to(path: Path, parent: Path) -> bool:

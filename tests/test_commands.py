@@ -33,7 +33,7 @@ class TestCmdInstall:
         tools = [_make_spec(bin="rg")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.installed_version", return_value=None),
             patch("ptm.commands.do_install") as mock_do,
         ):
             cmd_install(tools, None, client)
@@ -43,7 +43,7 @@ class TestCmdInstall:
         tools = [_make_spec(bin="rg")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.1.0"),
+            patch("ptm.commands.installed_version", return_value="14.1.0"),
             patch("ptm.commands.do_install") as mock_do,
         ):
             cmd_install(tools, None, client)
@@ -53,7 +53,7 @@ class TestCmdInstall:
         tools = [_make_spec(bin="rg")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.1.0"),
+            patch("ptm.commands.installed_version", return_value="14.1.0"),
             patch("ptm.commands.do_install") as mock_do,
         ):
             cmd_install(tools, "rg", client)
@@ -63,7 +63,7 @@ class TestCmdInstall:
         tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.installed_version", return_value=None),
             patch("ptm.commands.do_install") as mock_do,
         ):
             cmd_install(tools, "rg", client)
@@ -85,7 +85,7 @@ class TestCmdUpdate:
         tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.installed_version", return_value=None),
             patch(
                 "ptm.commands.resolve_install_plan",
                 side_effect=[InstallPlan(tools[0]), InstallPlan(tools[1])],
@@ -101,7 +101,7 @@ class TestCmdUpdate:
         tools = [_make_spec(bin="rg"), _make_spec(bin="fd", repo="sharkdp/fd")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value=None),
+            patch("ptm.commands.installed_version", return_value=None),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0]),
@@ -122,7 +122,7 @@ class TestCmdUpdate:
         tools = [_make_spec(bin="rg", version="latest")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.1.0"),
+            patch("ptm.commands.installed_version", return_value="14.1.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="v14.1.0"),
@@ -138,7 +138,7 @@ class TestCmdUpdate:
         ]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="22.0.0"),
+            patch("ptm.commands.installed_version", return_value="22.0.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="v22.0.0"),
@@ -153,7 +153,7 @@ class TestCmdUpdate:
         client = MagicMock()
         plan = InstallPlan(tools[0], version="v14.1.0")
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.0.0"),
+            patch("ptm.commands.installed_version", return_value="14.0.0"),
             patch("ptm.commands.resolve_install_plan", return_value=plan),
             patch("ptm.commands.do_install") as mock_do,
         ):
@@ -170,7 +170,7 @@ class TestCmdUpdate:
             return InstallPlan(spec, version="v1.0.0")
 
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.installed_version", return_value="0.9.0"),
             patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
             patch("ptm.commands.do_install", return_value=True),
         ):
@@ -184,7 +184,7 @@ class TestCmdUpdate:
             return InstallPlan(spec, version=f"v1.0.0-{spec.bin}")
 
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.installed_version", return_value="0.9.0"),
             patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
             patch("ptm.commands.do_install", return_value=True) as mock_do,
         ):
@@ -202,7 +202,7 @@ class TestCmdUpdate:
             return InstallPlan(spec, version="v1.0.0")
 
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.installed_version", return_value="0.9.0"),
             patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
             patch("ptm.commands.do_install", return_value=True) as mock_do,
             pytest.raises(SystemExit),
@@ -219,12 +219,12 @@ class TestCmdUpdate:
 class TestCmdList:
     def test_shows_installed_version(self):
         tools = [_make_spec(bin="rg")]
-        with patch("ptm.commands.get_installed_version", return_value="14.1.0"):
+        with patch("ptm.commands.installed_version", return_value="14.1.0"):
             cmd_list(tools)  # 例外なく完了すること
 
     def test_shows_not_installed(self):
         tools = [_make_spec(bin="rg")]
-        with patch("ptm.commands.get_installed_version", return_value=None):
+        with patch("ptm.commands.installed_version", return_value=None):
             cmd_list(tools)
 
 
@@ -236,7 +236,7 @@ class TestCmdCheck:
         tools = [_make_spec(bin="rg", version="latest")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.1.0"),
+            patch("ptm.commands.installed_version", return_value="14.1.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="v14.1.0"),
@@ -248,7 +248,7 @@ class TestCmdCheck:
         tools = [ToolSpec(bin="uv", type="installer", command="install.sh")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.5.0"),
+            patch("ptm.commands.installed_version", return_value="0.5.0"),
             patch("ptm.commands.resolve_install_plan") as mock_plan,
         ):
             cmd_check(tools, client)
@@ -265,7 +265,7 @@ class TestCmdCheck:
         ]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.5.0"),
+            patch("ptm.commands.installed_version", return_value="0.5.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="0.5.1"),
@@ -279,7 +279,7 @@ class TestCmdCheck:
         tools = [ToolSpec(bin="markdownlint-cli2", type=tool_type)]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.15.0"),
+            patch("ptm.commands.installed_version", return_value="0.15.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="0.15.0"),
@@ -292,7 +292,7 @@ class TestCmdCheck:
         tools = [_make_spec(bin="nvim", version="nightly")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.10.0-dev"),
+            patch("ptm.commands.installed_version", return_value="0.10.0-dev"),
             patch("ptm.commands.resolve_install_plan") as mock_plan,
         ):
             cmd_check(tools, client)
@@ -304,7 +304,7 @@ class TestCmdCheck:
         ]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="22.0.0"),
+            patch("ptm.commands.installed_version", return_value="22.0.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 return_value=InstallPlan(tools[0], version="v22.0.0"),
@@ -316,7 +316,7 @@ class TestCmdCheck:
         tools = [_make_spec(bin="rg")]
         client = MagicMock()
         with (
-            patch("ptm.commands.get_installed_version", return_value="14.0.0"),
+            patch("ptm.commands.installed_version", return_value="14.0.0"),
             patch(
                 "ptm.commands.resolve_install_plan",
                 side_effect=RuntimeError("API error"),
@@ -334,7 +334,7 @@ class TestCmdCheck:
             return InstallPlan(spec, version="v1.0.0")
 
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.installed_version", return_value="0.9.0"),
             patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
         ):
             cmd_check(tools, client)
@@ -347,7 +347,7 @@ class TestCmdCheck:
             return InstallPlan(spec, version=f"v1.0.0-{spec.bin}")
 
         with (
-            patch("ptm.commands.get_installed_version", return_value="0.9.0"),
+            patch("ptm.commands.installed_version", return_value="0.9.0"),
             patch("ptm.commands.resolve_install_plan", side_effect=resolve_plan),
             patch("ptm.commands.console.print") as mock_print,
         ):
