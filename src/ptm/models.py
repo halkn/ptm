@@ -10,7 +10,7 @@ class ToolSpec:
     type: str = "github_release"
     version: str = "latest"
     version_cmd: list[str] = field(default_factory=list)
-    version_regex: str = r"(\S+)"
+    version_regex: str = r"v?(\d+(?:\.\d+)+(?:[-+.][0-9A-Za-z.-]+)?)"
     # binary release 共通 (github_release / url_release)
     platforms: dict[str, str] = field(default_factory=dict)
     extract: str = ""

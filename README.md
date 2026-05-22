@@ -186,7 +186,7 @@ version_regex = 'uv ([\d.]+)'
 | `source`              | all (table form)         | `backend:locator[@version]` string                                                       |
 | `version`             | all                      | Version to install. Defaults to `latest`; `nightly` for GitHub releases                  |
 | `version_cmd`         | all                      | Version check command. Defaults to `[bin, "--version"]`                                  |
-| `version_regex`       | all                      | Regular expression used to extract the installed version string                          |
+| `version_regex`       | all                      | Regular expression (with one capture group) to extract the installed version from `version_cmd` output. Defaults to the first version-like token (e.g. `14.1.0` from `ripgrep 14.1.0`), so it is rarely needed |
 | `platforms`           | `github`, `url`          | Override automatic asset selection. Maps platform keys to asset names (`github`) or full URLs (`url`) |
 | `bin_path_in_archive` | `github`, `url`          | Binary path inside the archive when the full archive should be extracted                 |
 | `strip_components`    | `github`, `url`          | Leading path components to strip when extracting tar archives. Defaults to `1`           |

@@ -67,6 +67,22 @@ class TestGetInstalledVersion:
         with patch("subprocess.check_output", return_value="ripgrep 14.1.0\n"):
             assert get_installed_version(spec) == "14.1.0"
 
+    @pytest.mark.parametrize(
+        ("output", "expected"),
+        [
+            ("ripgrep 14.1.0\n-SIMD -AVX (compiled)", "14.1.0"),
+            ("fd 9.0.0", "9.0.0"),
+            ("v20.11.0", "20.11.0"),
+            ("uv 0.5.1 (abc 2024-01-01)", "0.5.1"),
+            ("Version 5.4.2", "5.4.2"),
+            ("go version go1.22.0 linux/amd64", "1.22.0"),
+        ],
+    )
+    def test_default_regex_extracts_version_token(self, output, expected):
+        spec = ToolSpec(bin="tool")
+        with patch("subprocess.check_output", return_value=output):
+            assert get_installed_version(spec) == expected
+
     def test_returns_none_when_not_found(self):
         spec = ToolSpec(bin="nonexistent")
         with patch("subprocess.check_output", side_effect=FileNotFoundError):
